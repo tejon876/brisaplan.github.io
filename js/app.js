@@ -1,12 +1,16 @@
 import { CONFIG } from './config.js';
 import {
   todayISO,
-  loadState,
-  saveState,
-  loadSession,
-  saveSession,
+  createCleanState,
+  registerPasswordAccount,
+  authenticatePasswordAccount,
+  authenticateGoogleAccount,
+  loadEncryptedVault,
+  saveEncryptedVault,
+  loadActiveSession,
+  saveActiveSession,
   clearSessionOnly,
-  clearAllLocalData,
+  deleteUserAccountAndVault,
   exportUserJSON
 } from './storage.js';
 import {
@@ -34,15 +38,14 @@ import {
 } from './mail-classroom.js';
 import { ARCO_INFO, TUTORIAL_STEPS } from './legal.js';
 
-let state = loadState();
-let session = loadSession();
+let state = createCleanState();
+let session = loadActiveSession();
 let selectedTaskColor = CONFIG.taskPalette[0];
 let activePomoTaskId = null;
 let pomoSeconds = CONFIG.defaultPomodoroSec;
 let pomoTimer = null;
 let tutorialIndex = 0;
-let pendingLoginEmail = '';
-let activeVerificationCode = '';
+let authFormMode = 'login'; // 'login' | 'register'
 
 const $ = (s) => document.querySelector(s);
 
@@ -51,7 +54,7 @@ function toast(msg) {
   if (!el) return;
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 3200);
+  setTimeout(() => el.classList.remove('show'), 3400);
 }
 
 function esc(str) {
@@ -60,6 +63,29 @@ function esc(str) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+/* Service Worker & Notificaciones seguras (compatible Android Chrome + Desktop) */
+let swReg = null;
+async function initServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    try {
+      swReg = await navigator.serviceWorker.register('./sw.js');
+    } catch {}
+  }
+}
+
+async function showSafeNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    if (swReg && swReg.showNotification) {
+      await swReg.showNotification(title, { body });
+    } else {
+      new Notification(title, { body });
+    }
+  } catch {
+    // Fallback silencioso en navegadores móviles sin SW activo
+  }
 }
 
 /* Tema Oscuro */
@@ -84,19 +110,13 @@ function parseJwtPayload(token) {
   return JSON.parse(jsonPayload);
 }
 
-function completeLogin({ email, name, picture, provider = 'Google' }) {
-  const clean = email.trim().toLowerCase();
-  session = {
-    email: clean,
-    name: name || clean.split('@')[0],
-    picture: picture || '',
-    provider,
-    loggedAt: new Date().toISOString()
-  };
-  saveSession(session);
-  connectMailAccount(state, clean, provider);
-  updateAuthView();
-  toast(`Bienvenido, ${session.name}`);
+async function openUnlockedSession(newSession) {
+  session = newSession;
+  saveActiveSession(session);
+  state = await loadEncryptedVault(session);
+  connectMailAccount(state, session.email, session.provider);
+  await updateAuthView();
+  toast(`Bóveda desbloqueada para ${session.name}`);
 }
 
 /* Inicializar botón oficial de Google Identity Services */
@@ -108,22 +128,24 @@ function initGoogleIdentityServices() {
     if (window.google?.accounts?.id) {
       window.google.accounts.id.initialize({
         client_id: CONFIG.googleClientId,
-        callback: (response) => {
+        callback: async (response) => {
           try {
             const payload = parseJwtPayload(response.credential);
-            completeLogin({
+            const googleSess = await authenticateGoogleAccount({
               email: payload.email,
               name: payload.name || payload.given_name,
               picture: payload.picture,
-              provider: 'Google'
+              sub: payload.sub
             });
+            await openUnlockedSession(googleSess);
           } catch {
-            toast('No se pudo leer la credencial de Google.');
+            toast('No se pudo validar la credencial de Google.');
           }
         },
         auto_select: false
       });
 
+      target.innerHTML = '';
       window.google.accounts.id.renderButton(target, {
         theme: document.body.classList.contains('dark-mode') ? 'filled_black' : 'outline',
         size: 'large',
@@ -149,41 +171,13 @@ function initGoogleIdentityServices() {
   }
 }
 
-/* Verificación real de dominio de correo (MX via DNS-over-HTTPS) */
-async function verifyEmailDomainExists(email) {
-  const domain = email.split('@')[1]?.toLowerCase();
-  if (!domain || !domain.includes('.')) return false;
-  const commonTypos = { 'gmal.com': 'gmail.com', 'hotmal.com': 'hotmail.com', 'outlok.com': 'outlook.com' };
-  if (commonTypos[domain]) {
-    throw new Error(`¿Quisiste decir @${commonTypos[domain]}?`);
-  }
-  try {
-    const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=MX`);
-    const data = await res.json();
-    return Array.isArray(data.Answer) && data.Answer.length > 0;
-  } catch {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-  }
-}
-
-async function dispatchVerificationCode(email) {
-  activeVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
-  if ('Notification' in window && Notification.permission === 'default') {
-    await Notification.requestPermission();
-  }
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('BrisaPlan — Código de verificación', {
-      body: `Tu código para ${email} es: ${activeVerificationCode}`
-    });
-  }
-  return activeVerificationCode;
-}
-
-/* Login Gate */
-function updateAuthView() {
-  if (session && session.email) {
+/* Control estricto de bloqueo/desbloqueo */
+async function updateAuthView() {
+  if (session && session.email && session.secret) {
+    document.body.classList.remove('auth-locked');
     $('#login-gate').style.display = 'none';
     $('#app-shell').style.display = 'block';
+
     const badge = $('#header-avatar');
     if (badge) {
       badge.innerHTML = session.picture
@@ -191,12 +185,13 @@ function updateAuthView() {
         : esc((session.name?.[0] || 'B').toUpperCase());
     }
     const userLabel = $('#header-user-email');
-    if (userLabel) userLabel.textContent = session.email;
-    renderAll();
+    if (userLabel) userLabel.textContent = `${session.email} · Cifrado`;
+    await renderAll();
     if (!state.tutorialSeen) {
       openTutorial();
     }
   } else {
+    document.body.classList.add('auth-locked');
     $('#login-gate').style.display = 'flex';
     $('#app-shell').style.display = 'none';
     initGoogleIdentityServices();
@@ -414,8 +409,8 @@ function renderMiEspacio() {
   $('#paypal-donate-btn').href = CONFIG.paypalUrl;
 }
 
-function renderAll() {
-  saveState(state);
+async function renderAll() {
+  await saveEncryptedVault(state, session);
   renderColorSwatches();
   renderStats();
   renderHoy();
@@ -454,6 +449,15 @@ function switchTab(tabName) {
   });
 }
 
+function setAuthFormMode(mode) {
+  authFormMode = mode;
+  $('#tab-mode-login').classList.toggle('active', mode === 'login');
+  $('#tab-mode-register').classList.toggle('active', mode === 'register');
+  $('#confirm-pw-wrap').style.display = mode === 'register' ? 'flex' : 'none';
+  $('#login-password-confirm').required = mode === 'register';
+  $('#btn-auth-submit').textContent = mode === 'register' ? 'Crear cuenta cifrada y entrar' : 'Desbloquear y entrar';
+}
+
 function setupEvents() {
   document.querySelectorAll('[data-toggle-theme]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -462,53 +466,54 @@ function setupEvents() {
     });
   });
 
-  // Login alternativo con correo y código por notificación del sistema
+  // Cambio entre Iniciar sesión y Crear cuenta con contraseña cifrada
+  $('#tab-mode-login').addEventListener('click', () => setAuthFormMode('login'));
+  $('#tab-mode-register').addEventListener('click', () => setAuthFormMode('register'));
+
+  // Mostrar / ocultar contraseña
+  $('#toggle-pw-vis').addEventListener('click', () => {
+    const inp = $('#login-password-input');
+    const isHidden = inp.type === 'password';
+    inp.type = isHidden ? 'text' : 'password';
+    $('#toggle-pw-vis').textContent = isHidden ? 'Ocultar' : 'Mostrar';
+  });
+
+  // Envío de formulario Correo + Contraseña cifrada (PBKDF2 + AES-GCM)
   $('#login-email-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = $('#login-email-input').value.trim().toLowerCase();
-    const btn = $('#btn-send-code');
-    btn.disabled = true;
-    btn.textContent = 'Verificando correo...';
+    const password = $('#login-password-input').value;
+    const confirmPw = $('#login-password-confirm').value;
+    const btn = $('#btn-auth-submit');
 
-    try {
-      const exists = await verifyEmailDomainExists(email);
-      if (!exists) {
-        toast('El dominio del correo no existe o no recibe mensajes.');
-        return;
-      }
-      pendingLoginEmail = email;
-      await dispatchVerificationCode(email);
-      $('#login-step-email').style.display = 'none';
-      $('#login-step-code').style.display = 'block';
-      $('#verify-target-email').textContent = email;
-      toast('Revisa la notificación en tu pantalla con el código de 6 dígitos.');
-    } catch (err) {
-      toast(err.message || 'No se pudo verificar el correo.');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Continuar con correo';
-    }
-  });
-
-  $('#btn-resend-code').addEventListener('click', async () => {
-    if (!pendingLoginEmail) return;
-    await dispatchVerificationCode(pendingLoginEmail);
-    toast(`Código reenviado como notificación para ${pendingLoginEmail}`);
-  });
-
-  $('#btn-back-email').addEventListener('click', () => {
-    $('#login-step-code').style.display = 'none';
-    $('#login-step-email').style.display = 'block';
-  });
-
-  $('#login-code-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const code = $('#login-code-input').value.trim();
-    if (code !== activeVerificationCode) {
-      toast('El código no coincide. Revisa la notificación o usa Continuar con Google.');
+    if (password.length < 8) {
+      toast('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
-    completeLogin({ email: pendingLoginEmail, provider: 'Correo' });
+
+    if (authFormMode === 'register' && password !== confirmPw) {
+      toast('Las contraseñas no coinciden.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Cifrando credencial...';
+
+    try {
+      const unlockedSession =
+        authFormMode === 'register'
+          ? await registerPasswordAccount(email, password)
+          : await authenticatePasswordAccount(email, password);
+
+      $('#login-password-input').value = '';
+      $('#login-password-confirm').value = '';
+      await openUnlockedSession(unlockedSession);
+    } catch (err) {
+      toast(err.message || 'No se pudo autenticar.');
+    } finally {
+      btn.disabled = false;
+      setAuthFormMode(authFormMode);
+    }
   });
 
   // Navegación
@@ -528,7 +533,7 @@ function setupEvents() {
     $('#quick-task-modal').classList.remove('open');
   });
 
-  $('#quick-task-form').addEventListener('submit', (e) => {
+  $('#quick-task-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = $('#quick-task-title').value;
     const priority = $('#quick-task-prio').value;
@@ -542,12 +547,12 @@ function setupEvents() {
     }
     $('#quick-task-title').value = '';
     $('#quick-task-modal').classList.remove('open');
-    renderAll();
+    await renderAll();
     toast('Tarea agregada');
   });
 
   // Formulario Agenda
-  $('#agenda-form').addEventListener('submit', (e) => {
+  $('#agenda-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     addAgendaItem(
       state,
@@ -557,48 +562,40 @@ function setupEvents() {
       $('#agenda-date').value || todayISO()
     );
     $('#agenda-title').value = '';
-    renderAll();
+    await renderAll();
     toast('Bloque agregado a la agenda');
   });
 
   // Formulario Tareas
-  $('#task-form').addEventListener('submit', (e) => {
+  $('#task-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     addTask(state, $('#task-title-input').value, $('#task-prio-input').value, selectedTaskColor);
     $('#task-title-input').value = '';
-    renderAll();
+    await renderAll();
     toast('Tarea guardada');
   });
 
   // Formulario Hábitos
-  $('#habit-form').addEventListener('submit', (e) => {
+  $('#habit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     addHabit(state, $('#habit-title-input').value, $('#habit-cat-input').value);
     $('#habit-title-input').value = '';
-    renderAll();
+    await renderAll();
     toast('Hábito creado');
   });
 
   // Vincular correo con permiso en Correos
   $('#btn-connect-google-mail').addEventListener('click', async () => {
-    const email = prompt('Escribe el correo de Google que deseas vincular:');
-    if (!email) return;
-    const ok = await verifyEmailDomainExists(email.trim());
-    if (!ok) {
-      toast('Ese correo no parece válido.');
-      return;
-    }
-    if ('Notification' in window && Notification.permission !== 'denied') {
-      await Notification.requestPermission();
-    }
+    const email = prompt('Escribe el correo que deseas vincular a esta bóveda:');
+    if (!email || !email.includes('@')) return;
     const approved = confirm(`¿Aprobar permiso de lectura y organización de bandeja para ${email.trim()}?`);
     if (!approved) return;
-    connectMailAccount(state, email, 'Google');
-    renderAll();
+    connectMailAccount(state, email, 'Correo');
+    await renderAll();
     toast('Cuenta vinculada con permiso aprobado');
   });
 
-  $('#mail-add-form').addEventListener('submit', (e) => {
+  $('#mail-add-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     addMessage(state, {
       account: $('#mail-filter-account').value === 'all' ? state.mailAccounts[0]?.email : $('#mail-filter-account').value,
@@ -607,20 +604,20 @@ function setupEvents() {
     });
     $('#mail-sender').value = '';
     $('#mail-subject').value = '';
-    renderAll();
+    await renderAll();
     toast('Mensaje registrado en bandeja');
   });
 
   $('#mail-filter-account').addEventListener('change', renderMail);
 
-  $('#btn-clean-spam').addEventListener('click', () => {
+  $('#btn-clean-spam').addEventListener('click', async () => {
     const removed = cleanAllSpam(state);
-    renderAll();
+    await renderAll();
     toast(removed ? `Se eliminaron ${removed} correos spam` : 'No hay spam por limpiar');
   });
 
   // Delegación global
-  document.body.addEventListener('click', (e) => {
+  document.body.addEventListener('click', async (e) => {
     const swatch = e.target.closest('[data-pick-color]');
     if (swatch) {
       selectedTaskColor = swatch.dataset.pickColor;
@@ -634,16 +631,16 @@ function setupEvents() {
 
     if (act === 'toggle-habit') {
       toggleHabit(state, id);
-      renderAll();
+      await renderAll();
     } else if (act === 'del-habit') {
       removeHabit(state, id);
-      renderAll();
+      await renderAll();
     } else if (act === 'toggle-task') {
       toggleTask(state, id);
-      renderAll();
+      await renderAll();
     } else if (act === 'del-task') {
       removeTask(state, id);
-      renderAll();
+      await renderAll();
     } else if (act === 'focus-task') {
       activePomoTaskId = id;
       renderTasksAndHabits();
@@ -652,25 +649,25 @@ function setupEvents() {
       document.getElementById(`adj-${id}`)?.classList.toggle('open');
     } else if (act === 'shift-agenda') {
       shiftAgendaTime(state, id, Number(btn.dataset.min));
-      renderAll();
+      await renderAll();
       toast('Horario ajustado');
     } else if (act === 'tomorrow-agenda') {
       moveAgendaTomorrow(state, id);
-      renderAll();
+      await renderAll();
       toast('Bloque movido a mañana');
     } else if (act === 'del-agenda') {
       removeAgendaItem(state, id);
-      renderAll();
+      await renderAll();
     } else if (act === 'read-mail') {
       toggleMessageRead(state, id);
-      renderAll();
+      await renderAll();
     } else if (act === 'del-mail') {
       removeMessage(state, id);
-      renderAll();
+      await renderAll();
     }
   });
 
-  document.body.addEventListener('input', (e) => {
+  document.body.addEventListener('input', async (e) => {
     if (e.target.id === 'custom-task-color') {
       selectedTaskColor = e.target.value;
       renderColorSwatches();
@@ -678,14 +675,14 @@ function setupEvents() {
     const recolorId = e.target.dataset.recolorTask;
     if (recolorId) {
       updateTaskColor(state, recolorId, e.target.value);
-      renderAll();
+      await renderAll();
     }
   });
 
   // Pomodoro
   $('#pomo-start').addEventListener('click', () => {
     if (pomoTimer) return;
-    pomoTimer = setInterval(() => {
+    pomoTimer = setInterval(async () => {
       if (pomoSeconds > 0) {
         pomoSeconds -= 1;
         updatePomodoroText();
@@ -693,6 +690,7 @@ function setupEvents() {
         clearInterval(pomoTimer);
         pomoTimer = null;
         toast('Sesión Pomodoro completada');
+        await showSafeNotification('BrisaPlan — Pomodoro', 'Tu sesión de enfoque ha finalizado.');
       }
     }, 1000);
   });
@@ -710,17 +708,17 @@ function setupEvents() {
   });
 
   // Mi Espacio
-  $('#backup-days-input').addEventListener('change', (e) => {
+  $('#backup-days-input').addEventListener('change', async (e) => {
     const val = Math.max(7, Number(e.target.value) || 7);
     e.target.value = val;
     state.backupIntervalDays = val;
-    saveState(state);
+    await saveEncryptedVault(state, session);
     toast(`Respaldo programado cada ${val} días`);
   });
 
-  $('#btn-export-arco').addEventListener('click', () => {
-    exportUserJSON(state, session);
-    toast('Respaldo JSON descargado');
+  $('#btn-export-arco').addEventListener('click', async () => {
+    await exportUserJSON(state, session);
+    toast('Respaldo JSON descifrado descargado');
   });
 
   $('#btn-enable-notifs').addEventListener('click', async () => {
@@ -730,62 +728,68 @@ function setupEvents() {
     }
     const perm = await Notification.requestPermission();
     state.notificationsEnabled = perm === 'granted';
-    saveState(state);
+    await saveEncryptedVault(state, session);
     renderMiEspacio();
     if (state.notificationsEnabled) {
-      new Notification('BrisaPlan', { body: 'Notificaciones activadas correctamente en tu dispositivo.' });
+      await showSafeNotification('BrisaPlan', 'Notificaciones activadas correctamente en tu dispositivo.');
+      toast('Notificaciones activadas');
     }
   });
 
   ['w-chk-tasks', 'w-chk-mail', 'w-chk-habits'].forEach((id) => {
-    document.getElementById(id).addEventListener('change', () => {
+    document.getElementById(id).addEventListener('change', async () => {
       state.selectedWidgets = {
         tasksAgenda: $('#w-chk-tasks').checked,
         mail: $('#w-chk-mail').checked,
         habits: $('#w-chk-habits').checked
       };
-      saveState(state);
+      await saveEncryptedVault(state, session);
       toast('Preferencia de widgets actualizada');
     });
   });
 
   $('#btn-open-tutorial').addEventListener('click', openTutorial);
 
-  $('#tut-next').addEventListener('click', () => {
+  $('#tut-next').addEventListener('click', async () => {
     if (tutorialIndex < TUTORIAL_STEPS.length - 1) {
       tutorialIndex += 1;
       renderTutorialStep();
     } else {
       state.tutorialSeen = true;
-      saveState(state);
+      await saveEncryptedVault(state, session);
       $('#tutorial-modal').classList.remove('open');
     }
   });
 
-  $('#btn-logout-only')?.addEventListener('click', () => {
+  $('#btn-logout-only').addEventListener('click', async () => {
     window.google?.accounts?.id?.disableAutoSelect();
     clearSessionOnly();
     session = null;
-    updateAuthView();
-    toast('Sesión cerrada');
+    state = createCleanState();
+    await updateAuthView();
+    toast('Bóveda bloqueada y sesión cerrada');
   });
 
-  $('#btn-delete-arco').addEventListener('click', () => {
-    if (!confirm('¿Eliminar permanentemente todos tus datos locales y cerrar sesión?')) return;
+  $('#btn-delete-arco').addEventListener('click', async () => {
+    if (!confirm('¿Eliminar permanentemente tu bóveda cifrada y cerrar sesión?')) return;
     window.google?.accounts?.id?.disableAutoSelect();
-    clearAllLocalData();
-    state = loadState();
+    if (session?.email) deleteUserAccountAndVault(session.email);
     session = null;
-    updateAuthView();
-    toast('Datos eliminados por completo');
+    state = createCleanState();
+    await updateAuthView();
+    toast('Bóveda y cuenta eliminadas por completo');
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await initServiceWorker();
   applyTheme(localStorage.getItem(CONFIG.themeKey) === 'dark');
   const agendaDate = $('#agenda-date');
   if (agendaDate) agendaDate.value = todayISO();
   updatePomodoroText();
   setupEvents();
-  updateAuthView();
+  if (session && session.email && session.secret) {
+    state = await loadEncryptedVault(session);
+  }
+  await updateAuthView();
 });

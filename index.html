@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BrisaPlan — Agenda, Tareas por Color y Hábitos</title>
+  <title>BrisaPlan — Bóveda Personal Cifrada</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A93C6" />
   <link rel="stylesheet" href="css/variables.css" />
@@ -11,8 +11,8 @@
   <link rel="stylesheet" href="css/components.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body>
-  <!-- Acceso oficial con Google Identity Services -->
+<body class="auth-locked">
+  <!-- Pantalla de acceso cifrado (bloquea el resto de la app hasta autenticar) -->
   <section id="login-gate" class="login-gate">
     <div class="login-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
@@ -20,44 +20,43 @@
           <div class="brand-badge">B</div>
           <div>
             <h1 class="brand-name">BrisaPlan</h1>
-            <p class="item-sub">Tu espacio diario sereno y organizado</p>
+            <p class="item-sub">Tu espacio diario cifrado y privado</p>
           </div>
         </div>
         <button type="button" data-toggle-theme class="btn btn-outline btn-xs">Modo oscuro</button>
       </div>
 
-      <div id="login-step-email">
-        <p class="item-sub" style="margin-bottom:14px;">
-          Inicia sesión con tu cuenta oficial de Google en un clic:
-        </p>
+      <p class="item-sub" style="margin-bottom:12px;">
+        Inicia sesión con tu cuenta oficial de Google en un clic:
+      </p>
 
-        <div id="google-signin-button" class="google-btn-wrap"></div>
+      <div id="google-signin-button" class="google-btn-wrap"></div>
 
-        <div class="divider-text">o con otro correo</div>
+      <div class="divider-text">o con correo y contraseña cifrada</div>
 
-        <form id="login-email-form" class="list-stack">
-          <input id="login-email-input" class="input" type="email" placeholder="tu.correo@ejemplo.com" required />
-          <button id="btn-send-code" type="submit" class="btn btn-primary" style="width:100%;">Continuar con correo</button>
-        </form>
+      <div class="auth-mode-switch">
+        <button type="button" id="tab-mode-login" class="auth-mode-btn active">Iniciar sesión</button>
+        <button type="button" id="tab-mode-register" class="auth-mode-btn">Crear cuenta</button>
       </div>
 
-      <div id="login-step-code" style="display:none;">
-        <p class="item-sub" style="margin-bottom:12px;">
-          Enviamos una notificación en pantalla con tu código de 6 dígitos para <strong id="verify-target-email"></strong>. Ingrésalo aquí para entrar:
-        </p>
-        <form id="login-code-form" class="list-stack">
-          <input id="login-code-input" class="input" type="text" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos" required />
-          <button type="submit" class="btn btn-primary" style="width:100%;">Verificar y entrar</button>
-          <div style="display:flex;gap:8px;">
-            <button type="button" id="btn-resend-code" class="btn btn-soft btn-xs" style="flex:1;">Reenviar código</button>
-            <button type="button" id="btn-back-email" class="btn btn-outline btn-xs" style="flex:1;">Cambiar correo</button>
-          </div>
-        </form>
-      </div>
+      <form id="login-email-form" class="list-stack">
+        <input id="login-email-input" class="input" type="email" autocomplete="username" placeholder="tu.correo@ejemplo.com" required />
+
+        <div class="pw-wrap">
+          <input id="login-password-input" class="input" type="password" autocomplete="current-password" minlength="8" placeholder="Contraseña (mínimo 8 caracteres)" required />
+          <button type="button" id="toggle-pw-vis" class="pw-toggle-btn">Mostrar</button>
+        </div>
+
+        <div id="confirm-pw-wrap" class="pw-wrap" style="display:none;">
+          <input id="login-password-confirm" class="input" type="password" autocomplete="new-password" minlength="8" placeholder="Confirmar contraseña" />
+        </div>
+
+        <button id="btn-auth-submit" type="submit" class="btn btn-primary" style="width:100%;">Desbloquear y entrar</button>
+      </form>
     </div>
   </section>
 
-  <!-- Aplicación Principal -->
+  <!-- Aplicación Principal (oculta hasta desbloquear sesión) -->
   <div id="app-shell" class="app-container" style="display:none;">
     <header class="topbar">
       <div class="brand-group">
@@ -305,12 +304,12 @@
         <div>
           <div class="card">
             <div class="card-head">
-              <h2 class="card-title">Apoyo y Tutorial</h2>
+              <h2 class="card-title">Seguridad, Apoyo y Tutorial</h2>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:10px;">
               <a id="paypal-donate-btn" href="https://paypal.me/jmatat8" target="_blank" rel="noopener" class="btn btn-peach">Apoyar con PayPal</a>
               <button id="btn-open-tutorial" type="button" class="btn btn-soft">Ver tutorial guiado</button>
-              <button id="btn-logout-only" type="button" class="btn btn-outline">Cerrar sesión</button>
+              <button id="btn-logout-only" type="button" class="btn btn-primary">Bloquear y cerrar sesión</button>
             </div>
           </div>
 
@@ -321,7 +320,7 @@
             <p id="arco-legal-text" class="item-sub" style="margin-bottom:14px;"></p>
             <div style="display:flex;flex-wrap:wrap;gap:10px;">
               <button id="btn-export-arco" type="button" class="btn btn-soft">Exportar datos (JSON)</button>
-              <button id="btn-delete-arco" type="button" class="btn btn-outline" style="color:#E11D48;border-color:#FDA4AF;">Eliminar datos y cuenta</button>
+              <button id="btn-delete-arco" type="button" class="btn btn-outline" style="color:#E11D48;border-color:#FDA4AF;">Eliminar bóveda y cuenta</button>
             </div>
           </div>
         </div>

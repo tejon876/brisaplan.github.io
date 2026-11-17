@@ -13,6 +13,13 @@ body {
   transition: var(--theme-transition);
 }
 
+/* Aislamiento total antes de autenticar */
+body.auth-locked #app-shell,
+body.auth-locked .mobile-bottom-nav,
+body.auth-locked .fab-add {
+  display: none !important;
+}
+
 .app-container {
   max-width: 1120px;
   margin: 0 auto;
@@ -68,6 +75,34 @@ body.dark-mode .login-gate {
   background: var(--border-subtle);
 }
 
+.auth-mode-switch {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-page);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.auth-mode-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-mode-btn.active {
+  background: var(--sky-primary);
+  color: #FFFFFF;
+}
+
 /* Header */
 .topbar {
   display: flex;
@@ -100,6 +135,7 @@ body.dark-mode .login-gate {
   font-weight: 800;
   font-size: 1.1rem;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .brand-badge img {

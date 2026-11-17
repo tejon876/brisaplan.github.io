@@ -1,7 +1,7 @@
 export const ARCO_INFO = {
-  title: 'Privacidad 100 % Local y Derechos ARCO',
+  title: 'Bóveda Cifrada AES-256 y Derechos ARCO',
   description:
-    'Tu agenda, tareas, hábitos y registros se almacenan localmente en tu navegador y se respaldan únicamente cuando tú lo decides. Puedes ejercer tus derechos de Acceso, Rectificación, Cancelación y Oposición en cualquier momento exportando o eliminando por completo tus datos.'
+    'Todos tus datos se cifran localmente con AES-GCM de 256 bits vinculados a tu contraseña o credencial de Google y se bloquean automáticamente al cerrar la pestaña o sesión. Puedes ejercer tus derechos ARCO exportando o destruyendo tu bóveda en cualquier momento.'
 };
 
 export const TUTORIAL_STEPS = [

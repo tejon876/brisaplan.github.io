@@ -1,7 +1,7 @@
 {
   "name": "BrisaPlan — Organizador y Hábitos",
   "short_name": "BrisaPlan",
-  "description": "Organizador personal minimalista para agenda, tareas con color, hábitos con rachas, Pomodoro y bandeja de correos.",
+  "description": "Organizador personal minimalista y cifrado para agenda, tareas con color, hábitos con rachas, Pomodoro y correos.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#FFF8F2",

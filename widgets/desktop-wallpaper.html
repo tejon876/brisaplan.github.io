@@ -37,74 +37,17 @@
       font-size: 0.94rem;
       color: #BDE0FE;
     }
-    .w-row {
-      padding: 8px 11px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.08);
-      margin-bottom: 7px;
-      font-size: 0.84rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-left: 4px solid #8ECAE6;
-    }
     .w-empty {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: #CBD5E1;
-      opacity: 0.8;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
-  <div id="widgets-root" style="display:flex;flex-wrap:wrap;gap:18px;"></div>
-
-  <script>
-    function renderWidgets() {
-      const root = document.getElementById('widgets-root');
-      let state = {};
-      try {
-        state = JSON.parse(localStorage.getItem('brisaplan_clean_state_v2') || '{}');
-      } catch {}
-
-      const prefs = state.selectedWidgets || { tasksAgenda: true, mail: true, habits: true };
-      const now = new Date();
-      const today = new Date(now - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-      let html = '';
-
-      if (prefs.tasksAgenda) {
-        const pending = (state.tasks || []).filter(t => !t.done).slice(0, 4);
-        const blocks = (state.agenda || []).filter(a => a.date === today).slice(0, 3);
-        html += `<div class="glass-card">
-          <div class="w-head"><span>Tareas y Agenda</span><span>${now.toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})}</span></div>
-          ${blocks.map(b => `<div class="w-row" style="border-left-color:${b.color || '#8ECAE6'}"><span>${b.time} · ${b.title}</span></div>`).join('')}
-          ${pending.map(t => `<div class="w-row" style="border-left-color:${t.color || '#FAD7A0'}"><span>${t.title}</span></div>`).join('')}
-          ${!blocks.length && !pending.length ? '<p class="w-empty">Sin pendientes ni bloques hoy</p>' : ''}
-        </div>`;
-      }
-
-      if (prefs.mail) {
-        const msgs = (state.messages || []).filter(m => !m.isSpam).slice(0, 4);
-        html += `<div class="glass-card">
-          <div class="w-head"><span>Correos</span><span>${msgs.length}</span></div>
-          ${msgs.map(m => `<div class="w-row"><span>${m.subject}</span></div>`).join('') || '<p class="w-empty">Bandeja limpia</p>'}
-        </div>`;
-      }
-
-      if (prefs.habits) {
-        const habits = (state.habits || []).slice(0, 5);
-        html += `<div class="glass-card">
-          <div class="w-head"><span>Hábitos</span><span>Hoy</span></div>
-          ${habits.map(h => {
-            const done = h.lastCompletedDate === today;
-            return `<div class="w-row"><span>${done ? '✓' : '○'} ${h.name}</span><span>🔥 ${h.streak || 0}d</span></div>`;
-          }).join('') || '<p class="w-empty">Sin hábitos registrados</p>'}
-        </div>`;
-      }
-
-      root.innerHTML = html || '<div class="glass-card"><p class="w-empty">Activa al menos un widget en Mi Espacio.</p></div>';
-    }
-    renderWidgets();
-    setInterval(renderWidgets, 4000);
-  </script>
+  <div class="glass-card">
+    <div class="w-head"><span>BrisaPlan · Bóveda Protegida</span><span>AES-256</span></div>
+    <p class="w-empty">Tus datos están cifrados con AES-GCM de 256 bits. Desbloquea tu sesión en BrisaPlan para visualizar tus tareas, agenda y hábitos.</p>
+  </div>
 </body>
 </html>
