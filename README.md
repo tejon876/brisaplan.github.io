@@ -1,18 +1,11 @@
 # BrisaPlan
 
-Organizador personal y gestor de hábitos diarios minimalista, 100% local (sin servidores externos).
+Aplicación web progresiva (PWA) minimalista para organizar agenda, tareas con color personalizable, hábitos con rachas, Pomodoro y bandeja de correos.
 
-## Estructura del proyecto
-- `index.html` — Vista principal de hábitos, rachas, Pomodoro, tareas y agenda.
-- `manifest.json` — Configuración PWA instalable.
-- `css/variables.css`, `css/layout.css`, `css/components.css` — Estilos modulares con diseño redondeado y paleta fría.
-- `js/config.js` — Configuración global.
-- `js/storage.js` — Persistencia en `localStorage`, respaldo semanal JSON y código de sincronización entre dispositivos.
-- `js/tasks-habits.js` — Lógica de hábitos diarios, rachas y tareas prioritarias.
-- `js/agenda.js` y `js/mail-classroom.js` — Bloques horarios y avisos rápidos.
-- `js/legal.js` y `js/app.js` — Controlador principal y aviso de privacidad local.
-- `widgets/desktop-wallpaper.html` — Widget de cristal transparente para escritorio.
+## Autenticación oficial con Google
+- Integrada con **Google Identity Services** (`https://accounts.google.com/gsi/client`) y el Client ID configurado en `js/config.js`.
+- Asegúrate de tener `https://tejon876.github.io` registrado en **Orígenes autorizados de JavaScript** dentro de Google Cloud Console y el estado en **En producción** dentro de **Público**.
 
-## Cómo subir a GitHub Pages
-1. Sube todos los archivos de esta carpeta a la raíz de un repositorio público en GitHub.
-2. Ve a **Settings → Pages**, selecciona la rama `main` y carpeta `/ (root)`, y guarda.
+## Publicación en GitHub Pages
+1. Descomprime `BrisaPlan-v4.zip` y sube el contenido a la raíz de tu repositorio `tejon876/Brisaplan`.
+2. Recarga `https://tejon876.github.io/Brisaplan/` (usa Ctrl+Shift+R para limpiar caché) y haz clic en **Continuar con Google**.
