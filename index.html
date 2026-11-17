@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BrisaPlan — Hábitos y Organizador Local</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0284c7" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">B</div>
+        <div class="brand-title">
+          <h1>BrisaPlan</h1>
+          <p>Hábitos, rachas y enfoque 100% local</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="btn-export-json" class="btn btn-soft">Respaldo JSON</button>
+        <button id="btn-open-sync" class="btn btn-primary">Sincronizar dispositivo</button>
+      </div>
+    </header>
+
+    <section class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-label">Hábitos de hoy</div>
+        <div id="stat-habits" class="stat-value">0 / 0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Mejor racha activa</div>
+        <div id="stat-streak" class="stat-value">0 días</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cumplimiento diario</div>
+        <div id="stat-rate" class="stat-value">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tareas pendientes</div>
+        <div id="stat-tasks" class="stat-value">0</div>
+      </div>
+    </section>
+
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="hoy">Hoy (Hábitos y Tareas)</button>
+      <button class="tab-btn" data-tab="agenda">Agenda y Avisos</button>
+      <button class="tab-btn" data-tab="privacidad">Privacidad y Widget</button>
+    </nav>
+
+    <!-- Panel Principal -->
+    <main id="panel-hoy" class="panel-section active">
+      <div class="grid-main">
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Hábitos Diarios y Rachas</h2>
+            </div>
+            <form id="habit-form" class="form-row">
+              <input id="habit-input" class="input" type="text" placeholder="Nuevo hábito (ej. Leer 20 min)..." required />
+              <select id="habit-category" class="select" style="max-width: 150px;">
+                <option value="Salud">Salud</option>
+                <option value="Estudio">Estudio</option>
+                <option value="Descanso">Descanso</option>
+                <option value="Enfoque">Enfoque</option>
+              </select>
+              <button type="submit" class="btn btn-primary">Agregar</button>
+            </form>
+            <div id="habit-list" class="habit-list"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Temporizador Pomodoro</h2>
+            </div>
+            <div class="pomodoro-box">
+              <div style="font-size:0.82rem;opacity:0.8;">Bloque de concentración</div>
+              <div id="pomodoro-display" class="pomodoro-time">25:00</div>
+              <div style="display:flex;justify-content:center;gap:8px;">
+                <button id="pomo-start" class="btn btn-primary">Iniciar</button>
+                <button id="pomo-pause" class="btn btn-soft">Pausar</button>
+                <button id="pomo-reset" class="btn btn-ghost" style="color:#fff;border-color:#475569;">Reiniciar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Tareas Prioritarias</h2>
+            </div>
+            <form id="task-form" class="form-row">
+              <input id="task-input" class="input" type="text" placeholder="Nueva tarea..." required />
+              <select id="task-priority" class="select" style="max-width: 130px;">
+                <option value="alta">Alta</option>
+                <option value="media" selected>Media</option>
+                <option value="baja">Baja</option>
+              </select>
+              <button type="submit" class="btn btn-primary">+</button>
+            </form>
+            <div id="task-list"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Panel Agenda -->
+    <section id="panel-agenda" class="panel-section">
+      <div class="grid-main">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Horario del Día</h2>
+          </div>
+          <form id="agenda-form" class="form-row">
+            <input id="agenda-time" class="input" type="time" style="max-width: 130px;" required />
+            <input id="agenda-title" class="input" type="text" placeholder="Actividad o clase..." required />
+            <button type="submit" class="btn btn-primary">Añadir</button>
+          </form>
+          <div id="agenda-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Avisos Rápidos (Correo / Classroom)</h2>
+          </div>
+          <form id="notice-form" class="form-row">
+            <select id="notice-source" class="select" style="max-width: 140px;">
+              <option value="Classroom">Classroom</option>
+              <option value="Gmail">Gmail</option>
+              <option value="Universidad">Universidad</option>
+            </select>
+            <input id="notice-subject" class="input" type="text" placeholder="Recordatorio o entrega..." required />
+            <button type="submit" class="btn btn-primary">Guardar</button>
+          </form>
+          <div id="notices-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Privacidad y Widget -->
+    <section id="panel-privacidad" class="panel-section">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Almacenamiento Local y Widget de Escritorio</h2>
+        </div>
+        <p id="privacy-text" style="color:var(--text-secondary);margin-bottom:16px;"></p>
+        <a href="widgets/desktop-wallpaper.html" target="_blank" class="btn btn-soft">Abrir Widget de Escritorio (Cristal)</a>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal Sincronización -->
+  <div id="sync-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="card-header">
+        <h3 class="card-title">Sincronizar entre dispositivos</h3>
+        <button id="btn-close-sync" class="btn-danger-sm">✕</button>
+      </div>
+      <p style="font-size:0.86rem;color:var(--text-secondary);">
+        Copia este código para llevar tu progreso a tu celular o PC, o pega un código recibido aquí:
+      </p>
+      <textarea id="sync-code-box" class="sync-textarea"></textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button id="btn-copy-sync" class="btn btn-soft">Copiar código</button>
+        <button id="btn-import-sync" class="btn btn-primary">Importar código</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
