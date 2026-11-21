@@ -1543,3 +1543,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
+/* ==========================================================================
+   BrisaPlan - Configuración de descarga directa del APK Android
+   ========================================================================== */
+const BRISAPLAN_APK_RELEASE = Object.freeze({
+  repository: "tejon876/brisaplan.github.io",
+  releaseTag: "latest",
+  fileName: "BrisaPlan.apk",
+  downloadUrl:
+    "https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk"
+});
+
+const BRISAPLAN_LEGACY_APK_REGEX =
+  /https?:\/\/github\.com\/tejon876\/BrisaPlan\/releases\/(?:latest|download)\/[^\s"'<>]*BrisaPlan\.apk/gi;
+
+function configureBrisaPlanApkLink(element) {
+  if (!element) return;
+
+  if (element.tagName === "A") {
+    element.setAttribute("href", BRISAPLAN_APK_RELEASE.downloadUrl);
+    element.setAttribute("download", BRISAPLAN_APK_RELEASE.fileName);
+    element.setAttribute("rel", "noopener noreferrer");
+    return;
+  }
+
+  if (!element.dataset.brisaplanApkBound) {
+    element.dataset.brisaplanApkBound = "true";
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      window.open(
+        BRISAPLAN_APK_RELEASE.downloadUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    });
+  }
+}
+
+function updateAllBrisaPlanApkDownloads() {
+  const links = document.querySelectorAll("a[href]");
+  links.forEach((link) => {
+    const href = link.getAttribute("href") || "";
+    if (BRISAPLAN_LEGACY_APK_REGEX.test(href)) {
+      configureBrisaPlanApkLink(link);
+    }
+  });
+
+  const candidateSelectors = [
+    "#download-apk-btn",
+    "#btn-download-apk",
+    "[data-download-apk]",
+    ".download-apk-btn"
+  ];
+
+  candidateSelectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((el) => {
+      configureBrisaPlanApkLink(el);
+    });
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", updateAllBrisaPlanApkDownloads);
+} else {
+  updateAllBrisaPlanApkDownloads();
+}
+
+window.BRISAPLAN_APK_RELEASE = BRISAPLAN_APK_RELEASE;
+window.BRISAPLAN_APK_URL = BRISAPLAN_APK_RELEASE.downloadUrl;
