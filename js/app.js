@@ -503,6 +503,7 @@ async function renderAll(persistToCloud = true) {
     await saveCloudVault();
   }
   renderAllColorPickers();
+  syncNativeWidgetSummary();
   renderStats();
   renderHoy();
   renderWeeklyAgenda();
@@ -858,6 +859,29 @@ function renderMiEspacio() {
   if (apkLink && GOOGLE_OAUTH_CONFIG.apkDownloadUrl) {
     apkLink.href = GOOGLE_OAUTH_CONFIG.apkDownloadUrl;
   }
+}
+
+
+function syncNativeWidgetSummary() {
+  try {
+    const today = todayISO();
+    const blocks = (state.agenda || []).filter((a) => isAgendaItemActiveOnDate(a, today));
+    const pending = (state.tasks || []).filter((t) => !t.done);
+    const lines = [];
+    if (blocks.length) {
+      lines.push(`Bloques hoy (${blocks.length}): ` + blocks.slice(0, 2).map((b) => `${b.time} ${b.title}`).join(', '));
+    }
+    if (pending.length) {
+      lines.push(`Pendientes (${pending.length}): ` + pending.slice(0, 2).map((t) => t.title).join(', '));
+    }
+    const summaryText = lines.length ? lines.join(' · ') : 'Todo al día por hoy en BrisaPlan.';
+    localStorage.setItem('brisaplan_widget_summary', summaryText);
+
+    const capPrefs = window.Capacitor?.Plugins?.Preferences;
+    if (capPrefs && typeof capPrefs.set === 'function') {
+      capPrefs.set({ key: 'brisaplan_widget_summary', value: summaryText }).catch(() => {});
+    }
+  } catch {}
 }
 
 function updatePomodoroText() {
