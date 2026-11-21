@@ -132,8 +132,7 @@ async function sendConnectionVerificationEmail(accessToken, accountEmail) {
     'Content-Type: text/html; charset=UTF-8',
     '',
     htmlBody
-  ].join('
-');
+  ].join('\n');
 
   const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
