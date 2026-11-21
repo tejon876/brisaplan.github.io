@@ -4,6 +4,10 @@ export function todayISO() {
   return new Date(now - offset).toISOString().split('T')[0];
 }
 
+export function todayWeekday() {
+  return new Date().getDay();
+}
+
 export function createCleanState() {
   return {
     habits: [],
