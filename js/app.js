@@ -96,6 +96,23 @@ function esc(str) {
     .replaceAll('"', '&quot;');
 }
 
+function isCapacitorNativeApp() {
+  return Boolean(
+    window.Capacitor &&
+      typeof window.Capacitor.isNativePlatform === 'function' &&
+      window.Capacitor.isNativePlatform()
+  );
+}
+
+function clearAuthErrorFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('apiKey') || url.hash.includes('error') || url.search.includes('error')) {
+      window.history.replaceState({}, document.title, url.pathname + url.search);
+    }
+  } catch {}
+}
+
 function saveLocalVaultSession(uid, secret, salt) {
   try {
     localStorage.setItem(`brisaplan_vault_key_${uid}`, JSON.stringify({ secret, salt, savedAt: Date.now() }));
@@ -856,8 +873,8 @@ function renderMiEspacio() {
   $('#notif-status-text').textContent = state.notificationsEnabled ? 'Activadas en este dispositivo' : 'Desactivadas';
   $('#arco-legal-text').textContent = ARCO_INFO.description;
   const apkLink = $('#btn-download-apk');
-  if (apkLink && GOOGLE_OAUTH_CONFIG.apkDownloadUrl) {
-    apkLink.href = GOOGLE_OAUTH_CONFIG.apkDownloadUrl;
+  if (apkLink) {
+    apkLink.href = BRISAPLAN_APK_RELEASE.downloadUrl;
   }
 }
 
@@ -1050,11 +1067,21 @@ function setupEvents() {
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
       await setPersistence(auth, browserLocalPersistence);
+      if (isCapacitorNativeApp()) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
       const result = await signInWithPopup(auth, provider);
       await handleUserAuthenticated(result.user);
     } catch (err) {
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
-        await signInWithRedirect(auth, provider);
+      const code = err?.code || '';
+      if (code === 'auth/popup-blocked') {
+        toast('Permite las ventanas emergentes (popups) en tu navegador o entra con correo y contraseña.');
+      } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        toast('Ventana de Google cerrada antes de iniciar sesión.');
+      } else if (code === 'auth/missing-initial-state' || String(err?.message || '').includes('missing initial state')) {
+        clearAuthErrorFromUrl();
+        toast('El navegador bloqueó el estado de sesión (sessionStorage). Usa correo y contraseña.');
       } else {
         toast('No se pudo conectar con Google.');
       }
@@ -1493,11 +1520,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     await setPersistence(auth, browserLocalPersistence);
     const redirectRes = await getRedirectResult(auth);
     if (redirectRes && redirectRes.user) {
+      clearAuthErrorFromUrl();
       await handleUserAuthenticated(redirectRes.user);
       return;
     }
   } catch (err) {
-    console.error(err);
+    const msg = String(err?.message || '');
+    if (msg.includes('missing initial state') || err?.code === 'auth/missing-initial-state') {
+      clearAuthErrorFromUrl();
+      toast('Sesión de redirección interrumpida por el navegador. Inicia con correo y contraseña.');
+    } else {
+      console.error(err);
+    }
   }
 
   window.addEventListener('online', async () => {
@@ -1543,6 +1577,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 });
+
 /* ==========================================================================
    BrisaPlan - Configuración de descarga directa del APK Android
    ========================================================================== */
