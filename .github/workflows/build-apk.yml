@@ -7,6 +7,9 @@ on:
     types: [ created, published ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -31,7 +34,8 @@ jobs:
       - name: Prepare www bundle for Capacitor
         run: |
           mkdir -p www
-          cp -r index.html manifest.json sw.js css js widgets www/ 2>/dev/null || cp -r index.html manifest.json sw.js css js www/
+          cp -r index.html manifest.json sw.js css js www/
+          if [ -d "widgets" ]; then cp -r widgets www/; fi
 
       - name: Initialize Capacitor and build APK
         run: |
@@ -39,10 +43,24 @@ jobs:
           npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
           npx cap add android || true
           npx cap copy android
+          if [ -d "android-widget-template/app/src/main" ]; then
+            cp -r android-widget-template/app/src/main/* android/app/src/main/
+          fi
           cd android && ./gradlew assembleDebug
+
+      - name: Rename APK to BrisaPlan.apk
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk BrisaPlan.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: BrisaPlan-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: BrisaPlan.apk
+
+      - name: Publish BrisaPlan.apk to Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" BrisaPlan.apk --clobber
