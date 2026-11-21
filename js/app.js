@@ -161,20 +161,224 @@ async function saveUserVaultMeta(uid, salt) {
   await setDoc(metaRef, { salt, hasMaster: true, updatedAt: new Date().toISOString() });
 }
 
+
+/* ==================== MODO OFFLINE LOCAL-FIRST Y SINCRONIZACIÓN ==================== */
+const OFFLINE_USER_KEY = 'brisaplan_offline_user_v73';
+const NOTIFIED_LOG_KEY = 'brisaplan_notified_events_v73';
+
+function saveOfflineUserProfile(user) {
+  if (!user) return;
+  try {
+    localStorage.setItem(OFFLINE_USER_KEY, JSON.stringify({
+      uid: user.uid,
+      email: user.email || '',
+      displayName: user.displayName || '',
+      photoURL: user.photoURL || ''
+    }));
+  } catch {}
+}
+
+function getOfflineUserProfile() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearOfflineUserProfile() {
+  try { localStorage.removeItem(OFFLINE_USER_KEY); } catch {}
+}
+
+function saveLocalEncryptedVault(uid, encryptedPayload, pendingSync = false) {
+  try {
+    localStorage.setItem(`brisaplan_offline_vault_${uid}`, JSON.stringify({
+      payload: encryptedPayload,
+      pendingSync,
+      updatedAt: Date.now()
+    }));
+  } catch {}
+}
+
+function getLocalEncryptedVault(uid) {
+  try {
+    const raw = localStorage.getItem(`brisaplan_offline_vault_${uid}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateSyncBadgeUI(status = 'synced') {
+  const badge = $('#sync-status-badge');
+  if (!badge) return;
+  if (!navigator.onLine || status === 'offline-pending') {
+    badge.className = 'sync-status-pill offline';
+    badge.textContent = navigator.onLine ? '↻ Sincronizando...' : '⚡ Sin internet (guardado local)';
+  } else {
+    badge.className = 'sync-status-pill';
+    badge.textContent = '● En línea · Sincronizado';
+  }
+}
+
+async function flushPendingOfflineSync() {
+  if (!navigator.onLine || !currentUser) return;
+  const cached = getLocalEncryptedVault(currentUser.uid);
+  if (!cached || !cached.pendingSync || !cached.payload) {
+    updateSyncBadgeUI('synced');
+    return;
+  }
+  try {
+    const vaultRef = doc(db, 'users', currentUser.uid, 'vault', 'data');
+    await setDoc(vaultRef, cached.payload);
+    saveLocalEncryptedVault(currentUser.uid, cached.payload, false);
+    updateSyncBadgeUI('synced');
+    toast('Conexión recuperada: cambios sincronizados con la nube.');
+  } catch {
+    updateSyncBadgeUI('offline-pending');
+  }
+}
+
+/* ==================== NOTIFICACIONES DE AGENDA Y ENTREGAS ==================== */
+function getNotifiedMap() {
+  try {
+    const raw = localStorage.getItem(NOTIFIED_LOG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function markEventNotified(key) {
+  try {
+    const map = getNotifiedMap();
+    map[key] = Date.now();
+    // Limpiar registros viejos (> 3 días)
+    const cutoff = Date.now() - 3 * 86400000;
+    for (const k of Object.keys(map)) {
+      if (map[k] < cutoff) delete map[k];
+    }
+    localStorage.setItem(NOTIFIED_LOG_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+function timeToMinutes(hhmm) {
+  if (!hhmm || !hhmm.includes(':')) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+async function checkScheduledNotifications() {
+  if (!state || !state.notificationsEnabled) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const now = new Date();
+  const today = todayISO();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const notified = getNotifiedMap();
+
+  // 1. Revisar bloques de agenda de hoy (aviso 10 min antes y a la hora exacta)
+  const todayBlocks = (state.agenda || []).filter((a) => isAgendaItemActiveOnDate(a, today));
+  for (const b of todayBlocks) {
+    const startMins = timeToMinutes(b.time);
+    if (startMins === null) continue;
+    const diff = startMins - nowMins;
+
+    if (diff === 10) {
+      const key = `agenda_pre_${b.id}_${today}`;
+      if (!notified[key]) {
+        markEventNotified(key);
+        await showSafeNotification('Próximo bloque en 10 min', `${b.title} comienza a las ${b.time}`);
+      }
+    } else if (diff === 0) {
+      const key = `agenda_now_${b.id}_${today}`;
+      if (!notified[key]) {
+        markEventNotified(key);
+        await showSafeNotification('¡Es hora de tu bloque!', `${b.title} (${b.time}${b.endTime ? ' - ' + b.endTime : ''})`);
+      }
+    }
+  }
+
+  // 2. Revisar tareas/entregas de hoy con hora límite (aviso 30 min antes y a la hora exacta)
+  const pendingTasks = (state.tasks || []).filter((t) => !t.done && t.dueDate === today && t.dueTime);
+  for (const t of pendingTasks) {
+    const dueMins = timeToMinutes(t.dueTime);
+    if (dueMins === null) continue;
+    const diff = dueMins - nowMins;
+
+    if (diff === 30) {
+      const key = `task_pre_${t.id}_${today}`;
+      if (!notified[key]) {
+        markEventNotified(key);
+        await showSafeNotification('Entrega en 30 minutos', `${t.title} vence a las ${t.dueTime}`);
+      }
+    } else if (diff === 0) {
+      const key = `task_now_${t.id}_${today}`;
+      if (!notified[key]) {
+        markEventNotified(key);
+        await showSafeNotification('¡Hora límite de entrega!', `${t.title} (${t.dueTime})`);
+      }
+    }
+  }
+}
+
 async function loadCloudVault(uid, secret, salt) {
-  const vaultRef = doc(db, 'users', uid, 'vault', 'data');
-  const snap = await getDoc(vaultRef);
-  if (!snap.exists()) return createCleanState();
-  const encrypted = snap.data();
-  const decrypted = await decryptVaultData(encrypted, secret, salt);
-  return { ...createCleanState(), ...decrypted };
+  const localCache = getLocalEncryptedVault(uid);
+
+  // Si no hay internet o hay cambios locales pendientes de subir, priorizar bóveda local cifrada
+  if ((!navigator.onLine || (localCache && localCache.pendingSync)) && localCache && localCache.payload) {
+    const decryptedLocal = await decryptVaultData(localCache.payload, secret, salt);
+    if (navigator.onLine && localCache.pendingSync) {
+      flushPendingOfflineSync().catch(() => {});
+    }
+    return { ...createCleanState(), ...decryptedLocal };
+  }
+
+  try {
+    const vaultRef = doc(db, 'users', uid, 'vault', 'data');
+    const snap = await getDoc(vaultRef);
+    if (!snap.exists()) {
+      if (localCache && localCache.payload) {
+        const decryptedLocal = await decryptVaultData(localCache.payload, secret, salt);
+        return { ...createCleanState(), ...decryptedLocal };
+      }
+      return createCleanState();
+    }
+    const encrypted = snap.data();
+    saveLocalEncryptedVault(uid, encrypted, false);
+    const decrypted = await decryptVaultData(encrypted, secret, salt);
+    return { ...createCleanState(), ...decrypted };
+  } catch (err) {
+    if (localCache && localCache.payload) {
+      const decryptedLocal = await decryptVaultData(localCache.payload, secret, salt);
+      return { ...createCleanState(), ...decryptedLocal };
+    }
+    throw err;
+  }
 }
 
 async function saveCloudVault() {
   if (!currentUser || !vaultSecret || !vaultSalt) return;
-  const vaultRef = doc(db, 'users', currentUser.uid, 'vault', 'data');
   const encrypted = await encryptVaultData(state, vaultSecret, vaultSalt);
-  await setDoc(vaultRef, encrypted);
+
+  // Siempre guardar primero en local cifrado para funcionamiento 100% sin internet
+  saveLocalEncryptedVault(currentUser.uid, encrypted, true);
+
+  if (!navigator.onLine) {
+    updateSyncBadgeUI('offline-pending');
+    return;
+  }
+
+  try {
+    const vaultRef = doc(db, 'users', currentUser.uid, 'vault', 'data');
+    await setDoc(vaultRef, encrypted);
+    saveLocalEncryptedVault(currentUser.uid, encrypted, false);
+    updateSyncBadgeUI('synced');
+  } catch {
+    updateSyncBadgeUI('offline-pending');
+  }
 }
 
 async function enterMainApp({ showWelcome = false } = {}) {
@@ -193,11 +397,14 @@ async function enterMainApp({ showWelcome = false } = {}) {
   const monthsSelect = $('#mail-months-range');
   if (monthsSelect) monthsSelect.value = String(state.mailMonthsRange || 1);
 
+  saveOfflineUserProfile(currentUser);
+  updateSyncBadgeUI(navigator.onLine ? 'synced' : 'offline-pending');
   await renderAll(false);
+  checkScheduledNotifications();
   if (!state.tutorialSeen) {
     setTimeout(() => openTutorial(), 450);
   }
-  if (showWelcome) toast('Sesión iniciada y guardada en este dispositivo');
+  if (showWelcome) toast('Sesión iniciada y guardada para uso sin internet');
 }
 
 async function deriveAndEnterWithPassword(user, rawPassword, isNewAccount = false) {
@@ -625,22 +832,20 @@ function renderMail() {
     ? filtered
         .map(
           (m) => `
-          <div class="item-row" style="${m.isSpam ? 'border-color:#F43F5E;' : m.important ? 'border-color:var(--sky-primary);' : ''};flex-wrap:wrap;">
-            <div style="min-width:0;flex:1;">
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
-                <span class="streak-pill" style="font-size:0.72rem;padding:2px 8px;">${esc(m.account)}</span>
-                <span class="item-sub">${esc(m.dateLabel || '')}</span>
-              </div>
-              <div class="item-title">${m.important && !m.isSpam ? '★ ' : ''}${m.isSpam ? '[Spam] ' : ''}${esc(m.subject)}</div>
-              <div class="item-sub">${esc(m.sender)}</div>
-              ${m.snippet ? `<div class="item-sub" style="margin-top:4px;opacity:0.88;">${esc(m.snippet)}</div>` : ''}
+          <article class="mail-card ${m.isSpam ? 'is-spam' : m.important ? 'is-important' : ''} ${m.read ? 'is-read' : ''}">
+            <div class="mail-card-header">
+              <span class="mail-account-badge" title="${esc(m.account)}">${esc(m.account)}</span>
+              <span class="mail-date">${esc(m.dateLabel || '')}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-soft btn-sm" data-act="star-mail" data-id="${m.id}">${m.important ? '★ Importante' : '☆ Importante'}</button>
-              <button class="btn btn-outline btn-sm" data-act="read-mail" data-id="${m.id}">${m.read ? 'Leído' : 'No leído'}</button>
-              <button class="btn-icon-del" data-act="del-mail" data-id="${m.id}" title="Eliminar">✕</button>
+            <div class="mail-subject">${m.important && !m.isSpam ? '★ ' : ''}${m.isSpam ? '<span class="mail-spam-tag">Spam</span> ' : ''}${esc(m.subject)}</div>
+            <div class="mail-sender">${esc(m.sender)}</div>
+            ${m.snippet ? `<p class="mail-snippet">${esc(m.snippet)}</p>` : ''}
+            <div class="mail-actions">
+              <button type="button" class="btn btn-soft btn-sm" data-act="star-mail" data-id="${m.id}">${m.important ? '★ Importante' : '☆ Importante'}</button>
+              <button type="button" class="btn btn-outline btn-sm" data-act="read-mail" data-id="${m.id}">${m.read ? 'Leído' : 'No leído'}</button>
+              <button type="button" class="btn-icon-del" data-act="del-mail" data-id="${m.id}" title="Eliminar">✕</button>
             </div>
-          </div>`
+          </article>`
         )
         .join('')
     : '<div class="empty-state">No se encontraron correos en esta sesión o filtro. Agrega una cuenta o ajusta el rango de meses.</div>';
@@ -1014,7 +1219,12 @@ function setupEvents() {
           : `¡${email} vinculada! Se cargaron ${syncedCount} mensajes.`
       );
     } catch (err) {
-      toast(err.message || 'No se pudo completar la autorización de correo.');
+      const msg = String(err?.message || '');
+      if (msg.includes('access_denied') || msg.includes('verification')) {
+        toast('Google bloqueó el correo porque no está agregado en "Usuarios de prueba" en Google Cloud Console.');
+      } else {
+        toast(msg || 'No se pudo completar la autorización de correo.');
+      }
     } finally {
       btn.disabled = false;
       btn.textContent = 'Continuar y autorizar acceso';
@@ -1233,6 +1443,7 @@ function setupEvents() {
   $('#btn-logout-only').addEventListener('click', async () => {
     if (!confirm('¿Cerrar sesión en este dispositivo?')) return;
     clearLocalVaultSession(currentUser?.uid);
+    clearOfflineUserProfile();
     await signOut(auth);
     currentUser = null;
     vaultSecret = null;
@@ -1265,10 +1476,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error(err);
   }
 
+  window.addEventListener('online', async () => {
+    updateSyncBadgeUI('offline-pending');
+    await flushPendingOfflineSync();
+  });
+
+  window.addEventListener('offline', () => {
+    updateSyncBadgeUI('offline-pending');
+    toast('Modo sin internet activo: tus cambios se guardarán localmente.');
+  });
+
+  // Revisar cada 20 segundos si toca notificación de bloque de agenda o entrega
+  setInterval(() => {
+    checkScheduledNotifications();
+  }, 20000);
+
+  // Si arranca sin internet y ya había sesión guardada, entrar directo sin esperar a Firebase Auth
+  if (!navigator.onLine) {
+    const offlineUser = getOfflineUserProfile();
+    if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {
+      await handleUserAuthenticated(offlineUser);
+    }
+  }
+
   onAuthStateChanged(auth, async (user) => {
     if (user && !vaultSecret) {
       await handleUserAuthenticated(user);
     } else if (!user && !isUnlocking) {
+      // Si no hay internet, conservar sesión offline local en vez de expulsar al login
+      if (!navigator.onLine) {
+        const offlineUser = getOfflineUserProfile();
+        if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {
+          if (!vaultSecret) await handleUserAuthenticated(offlineUser);
+          return;
+        }
+      }
       currentUser = null;
       document.body.classList.add('auth-locked');
       $('#login-gate').style.display = 'flex';

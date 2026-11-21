@@ -678,3 +678,126 @@
     max-width: 100% !important;
   }
 }
+
+
+/* Tarjetas de correo responsivas (móvil y escritorio) */
+.mail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid transparent;
+  transition: var(--theme-transition), transform 0.15s ease;
+}
+
+.mail-card.is-important {
+  border-color: rgba(74, 147, 198, 0.45);
+  border-left-color: var(--sky-primary);
+}
+
+.mail-card.is-spam {
+  border-color: rgba(244, 63, 94, 0.45);
+  border-left-color: #F43F5E;
+}
+
+.mail-card.is-read {
+  opacity: 0.78;
+}
+
+.mail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.mail-account-badge {
+  background: var(--peach-soft);
+  color: var(--text-main);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.74rem;
+  font-weight: 700;
+  max-width: 72%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mail-subject {
+  font-weight: 700;
+  font-size: 0.96rem;
+  line-height: 1.38;
+  color: var(--text-main);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.mail-spam-tag {
+  display: inline-block;
+  background: rgba(244, 63, 94, 0.16);
+  color: #FB7185;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 6px;
+  margin-right: 4px;
+}
+
+.mail-sender {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sky-primary);
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.mail-snippet {
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.mail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .mail-actions {
+    justify-content: space-between;
+  }
+  .mail-actions .btn {
+    flex: 1;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+}

@@ -1,12 +1,12 @@
-const CACHE_NAME = 'brisaplan-v7.1';
+const CACHE_NAME = 'brisaplan-v7.3';
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/variables.css',
-  './css/layout.css',
-  './css/components.css',
-  './js/app.js',
+  './css/variables.css?v=7.3',
+  './css/layout.css?v=7.3',
+  './css/components.css?v=7.3',
+  './js/app.js?v=7.3',
   './js/agenda.js',
   './js/tasks-habits.js',
   './js/mail-classroom.js',
@@ -35,14 +35,31 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put('./index.html', clone)).catch(() => {});
+          return res;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
-      .then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then((c) => c.put(event.request, clone)).catch(() => {});
-        return res;
-      })
-      .catch(() => caches.match(event.request))
+    caches.match(event.request).then((cached) => {
+      const networkFetch = fetch(event.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone)).catch(() => {});
+          return res;
+        })
+        .catch(() => cached);
+      return cached || networkFetch;
+    })
   );
 });
 
