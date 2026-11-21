@@ -11,22 +11,20 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   transition: var(--theme-transition);
+  overflow-x: hidden;
 }
 
-/* Aislamiento total antes de autenticar */
 body.auth-locked #app-shell,
-body.auth-locked .mobile-bottom-nav,
-body.auth-locked .fab-add {
+body.auth-locked .mobile-bottom-nav {
   display: none !important;
 }
 
 .app-container {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 20px 16px 96px;
+  padding: 16px 16px calc(92px + env(safe-area-inset-bottom));
 }
 
-/* Login Gate */
 .login-gate {
   min-height: 100vh;
   display: flex;
@@ -43,97 +41,46 @@ body.dark-mode .login-gate {
 
 .login-card {
   width: 100%;
-  max-width: 440px;
+  max-width: 420px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 28px;
+  padding: 28px 24px;
   box-shadow: var(--shadow-md);
   transition: var(--theme-transition);
 }
 
-.google-btn-wrap {
-  display: flex;
-  justify-content: center;
-  margin: 8px 0;
-  min-height: 44px;
-}
-
-.divider-text {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  margin: 14px 0;
-}
-
-.divider-text::before, .divider-text::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--border-subtle);
-}
-
-.auth-mode-switch {
-  display: flex;
-  gap: 6px;
-  background: var(--bg-page);
-  padding: 4px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-subtle);
-  margin-bottom: 12px;
-}
-
-.auth-mode-btn {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 7px 10px;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.auth-mode-btn.active {
-  background: var(--sky-primary);
-  color: #FFFFFF;
-}
-
-/* Header */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 14px 20px;
+  padding: 12px 16px;
   box-shadow: var(--shadow-sm);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   transition: var(--theme-transition);
 }
 
 .brand-group {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .brand-badge {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-sm);
   background: linear-gradient(135deg, var(--sky-primary), var(--sky-soft));
   color: #FFFFFF;
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -144,36 +91,53 @@ body.dark-mode .login-gate {
   object-fit: cover;
 }
 
+.brand-info {
+  min-width: 0;
+}
+
 .brand-name {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  display: block;
+}
+
+.user-sub-email {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .topbar-controls {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
-/* Navigation */
 .desktop-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .tab-btn {
-  padding: 9px 18px;
+  padding: 10px 18px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   color: var(--text-muted);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.2s ease;
 }
 
 .tab-btn:hover {
@@ -195,9 +159,11 @@ body.dark-mode .login-gate {
   right: 0;
   background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
-  padding: 8px 6px;
-  z-index: 40;
+  padding: 6px 4px calc(8px + env(safe-area-inset-bottom));
+  z-index: 50;
   justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08);
   transition: var(--theme-transition);
 }
 
@@ -205,21 +171,31 @@ body.dark-mode .login-gate {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 600;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   cursor: pointer;
-  padding: 4px 8px;
+  flex: 1;
+  min-height: 50px;
+  border-radius: 12px;
+  padding: 4px 2px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.mobile-nav-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
 .mobile-nav-btn.active {
   color: var(--sky-primary);
+  background: var(--sky-ice);
 }
 
-/* Grids & Panels */
 .view-panel {
   display: none;
 }
@@ -231,44 +207,22 @@ body.dark-mode .login-gate {
 .grid-2col {
   display: grid;
   grid-template-columns: 1.25fr 1fr;
-  gap: 18px;
+  gap: 16px;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.fab-add {
-  position: fixed;
-  right: 20px;
-  bottom: 24px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--sky-primary);
-  color: #FFFFFF;
-  border: none;
-  font-size: 1.5rem;
-  font-weight: 700;
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  z-index: 45;
-  display: grid;
-  place-items: center;
-  transition: transform 0.2s ease, background-color 0.2s ease;
-}
-
-.fab-add:hover {
-  background: var(--sky-hover);
-  transform: scale(1.06);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 @media (max-width: 768px) {
   .grid-2col {
     grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
   .desktop-tabs {
     display: none;
@@ -276,7 +230,7 @@ body.dark-mode .login-gate {
   .mobile-bottom-nav {
     display: flex;
   }
-  .fab-add {
-    bottom: 76px;
+  .user-sub-email {
+    max-width: 125px;
   }
 }

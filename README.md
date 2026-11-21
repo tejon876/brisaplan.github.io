@@ -1,8 +1,6 @@
-# BrisaPlan v5 — Bóveda Personal Cifrada
+# BrisaPlan v6.2 — Bóveda Profesional con Firebase
 
-## Seguridad implementada
-1. **Aislamiento total (`body.auth-locked`):** Mientras no exista una sesión desbloqueada en `sessionStorage`, la barra de navegación, los paneles y el botón flotante `+` permanecen ocultos y los datos no se cargan en memoria.
-2. **Autenticación doble:**
-   - **Continuar con Google:** SDK oficial de Google Identity Services (`45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com`).
-   - **Correo y contraseña cifrada:** Derivación de clave con **PBKDF2-SHA256** (120,000 iteraciones + salt aleatorio) y cifrado de bóveda con **AES-GCM 256 bits**.
-3. **Notificaciones compatibles con Android Chrome:** Uso de `ServiceWorkerRegistration.showNotification()` mediante `sw.js`.
+## Correcciones Implementadas
+1. **Acceso Exclusivo con Google + Contraseña Maestra:** Flujo en 2 pasos donde primero te autenticas con Google (`signInWithPopup` en PC / `signInWithRedirect` en móvil si hay bloqueo de popups) y después creas o ingresas tu **Contraseña Maestra** con confirmación y botón Mostrar/Ocultar.
+2. **Base de Datos Cloud Firestore Conectada:** Tus tareas, hábitos y agenda se cifran con `AES-GCM` de 256 bits y se sincronizan en tiempo real en tu proyecto `brisaplan-e0466`.
+3. **Diseño Móvil y PC Limpio:** Eliminación total del botón flotante `+` encimado, barra de navegación móvil con iconos claros y áreas táctiles grandes (`>= 44px`).

@@ -1,7 +1,7 @@
 export const ARCO_INFO = {
-  title: 'Bóveda Cifrada AES-256 y Derechos ARCO',
+  title: 'Bóveda Cifrada AES-256 y Cloud Firestore',
   description:
-    'Todos tus datos se cifran localmente con AES-GCM de 256 bits vinculados a tu contraseña o credencial de Google y se bloquean automáticamente al cerrar la pestaña o sesión. Puedes ejercer tus derechos ARCO exportando o destruyendo tu bóveda en cualquier momento.'
+    'Tus datos se almacenan cifrados con AES-256 bits en Cloud Firestore vinculados a tu contraseña maestra personal. Puedes cerrar sesión o cambiar de dispositivo manteniendo tu información segura y sincronizada.'
 };
 
 export const TUTORIAL_STEPS = [
@@ -23,6 +23,6 @@ export const TUTORIAL_STEPS = [
   },
   {
     title: '5. Mi Espacio y Widgets',
-    text: 'Configura la frecuencia de respaldo (desde 1 semana en adelante), activa notificaciones y descarga widgets para tu dispositivo.'
+    text: 'Configura la frecuencia de respaldo, activa notificaciones y descarga widgets para tu dispositivo.'
   }
 ];

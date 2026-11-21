@@ -1,4 +1,3 @@
-// Utilidades criptográficas nativas Web Crypto API (PBKDF2 + AES-GCM + SHA-256)
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
