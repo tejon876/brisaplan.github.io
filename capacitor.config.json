@@ -2,12 +2,7 @@
   "appId": "io.github.tejon876.brisaplan",
   "appName": "BrisaPlan",
   "webDir": "www",
-  "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https"
-  },
-  "android": {
-    "allowMixedContent": false,
-    "backgroundColor": "#FFF8F2"
   }
 }
