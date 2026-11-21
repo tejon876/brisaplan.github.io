@@ -40,6 +40,22 @@ jobs:
           npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
           npx cap add android || true
           npx cap copy android
+          python3 - << 'PYEOF'
+          from pathlib import Path
+
+          manifest_path = Path("android/app/src/main/AndroidManifest.xml")
+          if manifest_path.exists():
+              content = manifest_path.read_text(encoding="utf-8")
+              intent_filter = """        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="brisaplan" />
+          </intent-filter>"""
+              if 'android:scheme="brisaplan"' not in content and "</activity>" in content:
+                  content = content.replace("</activity>", f"{intent_filter}\n      </activity>", 1)
+                  manifest_path.write_text(content, encoding="utf-8")
+          PYEOF
           if [ -d "android-widget-template/app/src/main" ]; then
             cp -r android-widget-template/app/src/main/* android/app/src/main/
           fi
@@ -70,4 +86,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" BrisaPlan.apk --clobber
+          gh release upload "${{ github.event.release.tag.name }}" BrisaPlan.apk --clobber
