@@ -3,8 +3,6 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -109,6 +107,47 @@ function clearAuthErrorFromUrl() {
     const url = new URL(window.location.href);
     if (url.searchParams.has('apiKey') || url.hash.includes('error') || url.search.includes('error')) {
       window.history.replaceState({}, document.title, url.pathname + url.search);
+    }
+  } catch {}
+}
+
+function openExternalAuthFlow(url) {
+  try {
+    const capBrowser = window.Capacitor?.Plugins?.Browser;
+    if (capBrowser && typeof capBrowser.open === "function") {
+      return capBrowser.open({ url });
+    }
+  } catch {}
+  window.open(url, "_blank", "noopener,noreferrer");
+  return Promise.resolve();
+}
+
+function setupCapacitorAppUrlListener() {
+  try {
+    const capApp = window.Capacitor?.Plugins?.App;
+    if (capApp && typeof capApp.addListener === "function") {
+      capApp.addListener("appUrlOpen", async ({ url }) => {
+        if (!url || !url.startsWith("brisaplan://")) return;
+        clearAuthErrorFromUrl();
+        try {
+          const parsed = new URL(url.replace("brisaplan://", "https://auth.local/"));
+          const idToken = parsed.searchParams.get("id_token") || parsed.hash.match(/id_token=([^&]+)/)?.[1];
+          const accessToken = parsed.searchParams.get("access_token") || parsed.hash.match(/access_token=([^&]+)/)?.[1];
+          if (idToken || accessToken) {
+            const { GoogleAuthProvider, signInWithCredential } = await import(
+              "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"
+            );
+            const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
+            const res = await signInWithCredential(auth, credential);
+            if (res?.user) {
+              await handleUserAuthenticated(res.user);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+          toast("No se pudo completar el retorno desde Google. Usa correo y contraseña.");
+        }
+      });
     }
   } catch {}
 }
@@ -1065,12 +1104,25 @@ function setupEvents() {
     btn.disabled = true;
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+
     try {
       await setPersistence(auth, browserLocalPersistence);
+
       if (isCapacitorNativeApp()) {
-        await signInWithRedirect(auth, provider);
+        // Evita signInWithRedirect en WebView para no perder sessionStorage ni quedar en blanco.
+        // Abre el flujo en navegador externo y permite volver vía brisaplan:// o usar correo/contraseña.
+        const authUrl =
+          `https://accounts.google.com/o/oauth2/v2/auth` +
+          `?client_id=${encodeURIComponent(GOOGLE_OAUTH_CONFIG?.clientId || "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com")}` +
+          `&redirect_uri=${encodeURIComponent("https://tejon876.github.io/brisaplan.github.io/")}` +
+          `&response_type=token%20id_token` +
+          `&scope=${encodeURIComponent("openid email profile")}` +
+          `&nonce=${Date.now()}`;
+        await openExternalAuthFlow(authUrl);
+        toast("Completa el acceso en el navegador o inicia con correo y contraseña.");
         return;
       }
+
       const result = await signInWithPopup(auth, provider);
       await handleUserAuthenticated(result.user);
     } catch (err) {
@@ -1510,6 +1562,7 @@ function setupEvents() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initServiceWorker();
+  setupCapacitorAppUrlListener();
   applyTheme(localStorage.getItem('brisaplan_theme_v7') === 'dark');
   const dueDateInput = $('#task-due-date');
   if (dueDateInput) dueDateInput.value = todayISO();
@@ -1518,20 +1571,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     await setPersistence(auth, browserLocalPersistence);
-    const redirectRes = await getRedirectResult(auth);
-    if (redirectRes && redirectRes.user) {
-      clearAuthErrorFromUrl();
-      await handleUserAuthenticated(redirectRes.user);
-      return;
-    }
   } catch (err) {
-    const msg = String(err?.message || '');
-    if (msg.includes('missing initial state') || err?.code === 'auth/missing-initial-state') {
-      clearAuthErrorFromUrl();
-      toast('Sesión de redirección interrumpida por el navegador. Inicia con correo y contraseña.');
-    } else {
-      console.error(err);
-    }
+    console.error(err);
   }
 
   window.addEventListener('online', async () => {
