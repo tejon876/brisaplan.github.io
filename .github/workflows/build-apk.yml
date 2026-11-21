@@ -43,6 +43,16 @@ jobs:
           if [ -d "android-widget-template/app/src/main" ]; then
             cp -r android-widget-template/app/src/main/* android/app/src/main/
           fi
+          cat << 'EOF' >> android/app/build.gradle
+
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
+}
+EOF
           cd android && ./gradlew assembleDebug
 
       - name: Rename APK to BrisaPlan.apk
