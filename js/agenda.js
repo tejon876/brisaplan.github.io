@@ -1,6 +1,47 @@
 import { todayISO, todayWeekday } from './storage.js';
 
-export const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+export const WEEK_DAYS_MON_SUN = [
+  { day: 1, short: 'Lun', full: 'Lunes' },
+  { day: 2, short: 'Mar', full: 'Martes' },
+  { day: 3, short: 'Mié', full: 'Miércoles' },
+  { day: 4, short: 'Jue', full: 'Jueves' },
+  { day: 5, short: 'Vie', full: 'Viernes' },
+  { day: 6, short: 'Sáb', full: 'Sábado' },
+  { day: 0, short: 'Dom', full: 'Domingo' }
+];
+
+export const BLOCK_COLOR_PRESETS = [
+  { hex: '#4A93C6', name: 'Cielo' },
+  { hex: '#38B2AC', name: 'Menta' },
+  { hex: '#52B788', name: 'Bosque' },
+  { hex: '#6366F1', name: 'Índigo' },
+  { hex: '#8B5CF6', name: 'Lavanda' },
+  { hex: '#EC4899', name: 'Rosa' },
+  { hex: '#F59E0B', name: 'Ámbar' },
+  { hex: '#EF4444', name: 'Coral' }
+];
+
+export function getWeekDatesMonSun(baseIso = todayISO()) {
+  const [y, m, d] = baseIso.split('-').map(Number);
+  const base = new Date(y, (m || 1) - 1, d || 1);
+  const jsDay = base.getDay(); // 0=Dom..6=Sab
+  const diffToMonday = jsDay === 0 ? -6 : 1 - jsDay;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + diffToMonday);
+
+  return WEEK_DAYS_MON_SUN.map((info, idx) => {
+    const dt = new Date(monday);
+    dt.setDate(monday.getDate() + idx);
+    const off = dt.getTimezoneOffset() * 60000;
+    const iso = new Date(dt - off).toISOString().split('T')[0];
+    return {
+      ...info,
+      iso,
+      dayNum: dt.getDate(),
+      monthShort: dt.toLocaleDateString('es-MX', { month: 'short' })
+    };
+  });
+}
 
 export function isAgendaItemActiveOnDate(item, isoDate = todayISO()) {
   if (item.recurrence === 'permanent') {
@@ -20,12 +61,13 @@ export function addAgendaItem(
     title,
     color = '#4A93C6',
     date = todayISO(),
-    recurrence = 'temporary',
-    days = [1, 2, 3, 4, 5]
+    recurrence = 'permanent',
+    days = [1]
   }
 ) {
   const clean = (title || '').trim();
   if (!startTime || !clean) return;
+
   const normalizedDays =
     Array.isArray(days) && days.length
       ? [...new Set(days.map(Number))].sort((a, b) => a - b)
@@ -37,7 +79,7 @@ export function addAgendaItem(
     time: startTime,
     endTime: endTime || '',
     title: clean,
-    color,
+    color: color || '#4A93C6',
     recurrence: recurrence === 'permanent' ? 'permanent' : 'temporary',
     days: normalizedDays
   });
@@ -70,9 +112,7 @@ export function shiftAgendaTime(state, id, deltaMinutes) {
   let total = hh * 60 + mm + deltaMinutes;
   if (total < 0) total += 1440;
   total = total % 1440;
-  const newH = String(Math.floor(total / 60)).padStart(2, '0');
-  const newM = String(total % 60).padStart(2, '0');
-  item.time = `${newH}:${newM}`;
+  item.time = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 
   if (item.endTime) {
     const [eh, em] = item.endTime.split(':').map(Number);
@@ -84,24 +124,10 @@ export function shiftAgendaTime(state, id, deltaMinutes) {
   sortAgenda(state);
 }
 
-export function moveAgendaTomorrow(state, id) {
-  const item = state.agenda.find((a) => a.id === id);
-  if (!item) return;
-  item.recurrence = 'temporary';
-  const base = new Date((item.date || todayISO()) + 'T12:00:00');
-  base.setDate(base.getDate() + 1);
-  item.date = base.toISOString().split('T')[0];
-  sortAgenda(state);
-}
-
 export function removeAgendaItem(state, id) {
   state.agenda = state.agenda.filter((a) => a.id !== id);
 }
 
 function sortAgenda(state) {
-  state.agenda.sort((a, b) => {
-    const keyA = a.recurrence === 'permanent' ? `0000-00-00 ${a.time}` : `${a.date} ${a.time}`;
-    const keyB = b.recurrence === 'permanent' ? `0000-00-00 ${b.time}` : `${b.date} ${b.time}`;
-    return keyA.localeCompare(keyB);
-  });
+  state.agenda.sort((a, b) => a.time.localeCompare(b.time));
 }

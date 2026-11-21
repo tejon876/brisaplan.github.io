@@ -16,16 +16,25 @@ function decodeBase64Url(str) {
   }
 }
 
+function encodeBase64Url(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function extractBodyPreview(payload) {
   if (!payload) return '';
   if (payload.body?.data) {
     const txt = decodeBase64Url(payload.body.data).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (txt) return txt.slice(0, 180);
+    if (txt) return txt.slice(0, 200);
   }
   if (Array.isArray(payload.parts)) {
     for (const part of payload.parts) {
       if (part.mimeType === 'text/plain' && part.body?.data) {
-        return decodeBase64Url(part.body.data).replace(/\s+/g, ' ').trim().slice(0, 180);
+        return decodeBase64Url(part.body.data).replace(/\s+/g, ' ').trim().slice(0, 200);
       }
     }
     for (const part of payload.parts) {
@@ -41,19 +50,23 @@ function getHeader(headers = [], name) {
   return found ? found.value : '';
 }
 
-export function connectMailAccount(state, email, provider = 'Google') {
+export function connectMailAccount(state, email, provider = 'Gmail', label = '') {
   const clean = (email || '').trim().toLowerCase();
   if (!clean) return false;
   const existing = state.mailAccounts.find((a) => a.email === clean);
   if (existing) {
     existing.provider = provider;
+    if (label) existing.label = label;
     existing.connectedAt = new Date().toISOString();
+    existing.verified = true;
     return true;
   }
   state.mailAccounts.push({
     id: `acc-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     email: clean,
     provider,
+    label: label || clean.split('@')[0],
+    verified: true,
     connectedAt: new Date().toISOString()
   });
   return true;
@@ -69,7 +82,7 @@ export function disconnectMailAccount(state, email) {
 export function requestGmailAccessToken(hintEmail = '') {
   return new Promise((resolve, reject) => {
     if (!window.google?.accounts?.oauth2) {
-      reject(new Error('El servicio de Google OAuth aún no carga. Recarga e intenta de nuevo.'));
+      reject(new Error('El servicio de autorización de Google aún está cargando. Intenta de nuevo en 2 segundos.'));
       return;
     }
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -88,7 +101,52 @@ export function requestGmailAccessToken(hintEmail = '') {
   });
 }
 
-export async function linkAndSyncGmailAccount(state, hintEmail = '') {
+async function sendConnectionVerificationEmail(accessToken, accountEmail) {
+  const nowStr = new Date().toLocaleString('es-MX', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+  const confirmUrl = 'https://tejon876.github.io/BrisaPlan/#correos';
+  const subject = '=?UTF-8?B?' + btoa(unescape(encodeURIComponent('BrisaPlan · Confirmación de acceso y permiso de correo'))) + '?=';
+
+  const htmlBody = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border-radius:16px;border:1px solid #E2E8F0;background:#F8FAFC;color:#1E293B;">
+      <h2 style="color:#4A93C6;margin-top:0;">BrisaPlan — Vinculación de Cuenta Confirmada</h2>
+      <p>Hola <strong>${accountEmail}</strong>,</p>
+      <p>Tu cuenta de correo se vinculó correctamente con <strong>BrisaPlan</strong> el <strong>${nowStr}</strong>.</p>
+      <p style="font-size:14px;color:#475569;">Permisos autorizados: lectura organizada de bandeja de entrada, clasificación de importantes y limpieza de spam desde tu bóveda cifrada AES-256.</p>
+      <div style="margin:24px 0;text-align:center;">
+        <a href="${confirmUrl}" style="display:inline-block;background:#4A93C6;color:#FFFFFF;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:999px;">
+          Confirmar y abrir mi bandeja en BrisaPlan
+        </a>
+      </div>
+      <p style="font-size:12px;color:#64748B;">Si no reconoces esta vinculación, puedes revocar el acceso en cualquier momento desde tu cuenta de Google o dentro de BrisaPlan → Correos.</p>
+    </div>
+  `;
+
+  const rawMime = [
+    `To: ${accountEmail}`,
+    `From: ${accountEmail}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    '',
+    htmlBody
+  ].join('
+');
+
+  const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ raw: encodeBase64Url(rawMime) })
+  });
+  return res.ok;
+}
+
+export async function linkAndSyncGmailAccount(state, { hintEmail = '', label = '', months = 1, sendVerification = true } = {}) {
   const accessToken = await requestGmailAccessToken(hintEmail);
 
   const profileRes = await fetch('https://www.googleapis.com/gmail/v1/users/me/profile', {
@@ -100,16 +158,26 @@ export async function linkAndSyncGmailAccount(state, hintEmail = '') {
   const profile = await profileRes.json();
   const accountEmail = (profile.emailAddress || hintEmail || '').trim().toLowerCase();
   if (!accountEmail) {
-    throw new Error('No se detectó la dirección de correo de Google.');
+    throw new Error('No se detectó la dirección de correo.');
   }
 
   gmailTokenCache.set(accountEmail, accessToken);
-  connectMailAccount(state, accountEmail, 'Gmail');
-  const syncedCount = await syncGmailMessagesForAccount(state, accountEmail, accessToken);
-  return { email: accountEmail, syncedCount };
+  connectMailAccount(state, accountEmail, 'Gmail', label);
+
+  let verificationSent = false;
+  if (sendVerification) {
+    try {
+      verificationSent = await sendConnectionVerificationEmail(accessToken, accountEmail);
+    } catch {
+      verificationSent = false;
+    }
+  }
+
+  const syncedCount = await syncGmailMessagesForAccount(state, accountEmail, accessToken, months);
+  return { email: accountEmail, syncedCount, verificationSent };
 }
 
-export async function syncGmailMessagesForAccount(state, accountEmail, providedToken = null) {
+export async function syncGmailMessagesForAccount(state, accountEmail, providedToken = null, months = 1) {
   const cleanAccount = accountEmail.trim().toLowerCase();
   let token = providedToken || gmailTokenCache.get(cleanAccount);
   if (!token) {
@@ -117,7 +185,11 @@ export async function syncGmailMessagesForAccount(state, accountEmail, providedT
     gmailTokenCache.set(cleanAccount, token);
   }
 
-  const listUrl = 'https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=25&includeSpamTrash=true';
+  const clampedMonths = Math.min(12, Math.max(1, Number(months) || 1));
+  const days = clampedMonths * 30;
+  const query = encodeURIComponent(`newer_than:${days}d`);
+  const listUrl = `https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=45&includeSpamTrash=true&q=${query}`;
+
   const listRes = await fetch(listUrl, {
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -130,7 +202,7 @@ export async function syncGmailMessagesForAccount(state, accountEmail, providedT
   const otherMessages = state.messages.filter((m) => !(m.source === 'gmail' && m.account === cleanAccount));
   const fetched = [];
 
-  for (const ref of messageRefs.slice(0, 20)) {
+  for (const ref of messageRefs.slice(0, 35)) {
     const msgRes = await fetch(
       `https://www.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(ref.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -142,6 +214,7 @@ export async function syncGmailMessagesForAccount(state, accountEmail, providedT
     const sender = getHeader(headers, 'From') || 'Remitente desconocido';
     const subject = getHeader(headers, 'Subject') || '(Sin asunto)';
     const dateStr = getHeader(headers, 'Date') || '';
+    const parsedDate = dateStr ? new Date(dateStr) : new Date();
 
     const isSpam = labels.includes('SPAM') || labels.includes('TRASH');
     const isImportant = !isSpam && (labels.includes('IMPORTANT') || labels.includes('STARRED'));
@@ -155,22 +228,25 @@ export async function syncGmailMessagesForAccount(state, accountEmail, providedT
       sender,
       subject,
       snippet: msgData.snippet || extractBodyPreview(msgData.payload) || '',
-      dateLabel: dateStr ? new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : '',
+      timestamp: isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime(),
+      dateLabel: isNaN(parsedDate.getTime())
+        ? ''
+        : parsedDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }),
       isSpam,
       important: isImportant,
       read: !isUnread
     });
   }
 
-  state.messages = [...fetched, ...otherMessages];
+  state.messages = [...fetched, ...otherMessages].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   return fetched.length;
 }
 
-export async function syncAllConnectedGmailAccounts(state) {
+export async function syncAllConnectedGmailAccounts(state, months = 1) {
   let totalSynced = 0;
   for (const acc of state.mailAccounts) {
     if (acc.provider === 'Gmail') {
-      totalSynced += await syncGmailMessagesForAccount(state, acc.email);
+      totalSynced += await syncGmailMessagesForAccount(state, acc.email, null, months);
     }
   }
   return totalSynced;
@@ -178,16 +254,17 @@ export async function syncAllConnectedGmailAccounts(state) {
 
 export function addMessage(state, { account, sender, subject, isSpam = false, important = false }) {
   if (!(subject || '').trim()) return;
-  const spamKeywords = ['premio', 'ganaste', 'oferta urgente', 'casino', 'lotería', 'haz clic aquí', 'viagra', 'préstamo rápido'];
+  const spamKeywords = ['premio', 'ganaste', 'oferta urgente', 'casino', 'lotería', 'haz clic aquí', 'préstamo rápido'];
   const autoSpam = isSpam || spamKeywords.some((kw) => subject.toLowerCase().includes(kw));
 
   state.messages.unshift({
     id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     source: 'local',
     account: account || (state.mailAccounts[0]?.email ?? 'principal'),
-    sender: (sender || '').trim() || 'Remitente',
+    sender: (sender || '').trim() || 'Nota personal',
     subject: subject.trim(),
     snippet: '',
+    timestamp: Date.now(),
     dateLabel: 'Hoy',
     isSpam: autoSpam,
     important: !autoSpam && important,

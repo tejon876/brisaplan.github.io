@@ -8,6 +8,14 @@ export function todayWeekday() {
   return new Date().getDay();
 }
 
+export function formatShortDateES(isoDate) {
+  if (!isoDate) return '';
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
 export function createCleanState() {
   return {
     habits: [],
@@ -15,6 +23,7 @@ export function createCleanState() {
     agenda: [],
     mailAccounts: [],
     messages: [],
+    mailMonthsRange: 1,
     backupIntervalDays: 7,
     lastBackupAt: null,
     selectedWidgets: {

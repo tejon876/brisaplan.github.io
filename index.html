@@ -2,59 +2,100 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BrisaPlan — Bóveda Personal Cifrada</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>BrisaPlan — Organizador Personal y Bóveda Cifrada</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#4A93C6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="stylesheet" href="css/variables.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="auth-locked">
+  <!-- PORTAL DE ACCESO PROFESIONAL -->
   <section id="login-gate" class="login-gate">
-    <div class="login-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <div class="brand-group">
-          <div class="brand-badge">B</div>
-          <div>
-            <h1 class="brand-name">BrisaPlan</h1>
-            <p class="item-sub">Tu organizador personal cifrado</p>
+    <div class="login-shell">
+      <div class="login-brand-side">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+            <div class="brand-group">
+              <div class="brand-badge" style="background:rgba(255,255,255,0.22);">B</div>
+              <div>
+                <h1 class="brand-name" style="font-size:1.35rem;">BrisaPlan</h1>
+                <span style="font-size:0.82rem;opacity:0.9;">Productividad multiplataforma</span>
+              </div>
+            </div>
+            <button type="button" data-toggle-theme class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;">Modo oscuro</button>
           </div>
+          <h2 style="font-size:1.55rem;line-height:1.25;margin-bottom:10px;">Tu semana, entregas y correos en un solo lugar.</h2>
+          <p style="font-size:0.92rem;opacity:0.92;">Sincronización cifrada AES-256 en tiempo real para escritorio y celular, con sesión persistente.</p>
         </div>
-        <button type="button" data-toggle-theme class="btn btn-outline btn-sm">Modo oscuro</button>
+
+        <ul class="login-feature-list">
+          <li><span class="login-feature-dot">✓</span> Agenda semanal visual de Lunes a Domingo por bloques</li>
+          <li><span class="login-feature-dot">✓</span> Tareas con día, hora de entrega y enfoque Pomodoro</li>
+          <li><span class="login-feature-dot">✓</span> Bandeja inteligente multi-cuenta con búsqueda rápida</li>
+          <li><span class="login-feature-dot">✓</span> Sesión persistente segura sin reingresar cada vez</li>
+        </ul>
       </div>
 
-      <div id="login-step-google">
-        <p class="item-sub" style="margin-bottom:16px;text-align:center;font-size:0.9rem;">
-          Inicia sesión con tu cuenta de Google para sincronizar tu bóveda en PC y celular:
-        </p>
-        <button id="btn-google-login" type="button" class="btn btn-primary" style="width:100%;">
-          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35 11.1h-9.17v2.73h5.51c-.24 1.38-1.04 2.55-2.22 3.33v2.77h3.59c2.1-1.93 3.31-4.78 3.31-8.17 0-.74-.07-1.45-.22-2.13z"/><path fill="currentColor" d="M12.18 21.35c3.01 0 5.54-.99 7.38-2.69l-3.59-2.77c-.99.66-2.25 1.05-3.79 1.05-2.91 0-5.38-1.97-6.26-4.63H2.17v2.85c1.83 3.63 5.55 6.19 10.01 6.19z"/><path fill="currentColor" d="M5.92 12.31c-.22-.66-.35-1.36-.35-2.31s.13-1.65.35-2.31V4.84H2.17C1.43 6.32 1 8 1 9.8s.43 3.48 1.17 4.96l3.75-2.45z"/><path fill="currentColor" d="M12.18 5.75c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.72 2.45 15.19 1.5 12.18 1.5 7.72 1.5 4 4.06 2.17 7.69l3.75 2.85c.88-2.66 3.35-4.79 6.26-4.79z"/></svg>
-          Continuar con Google
-        </button>
-      </div>
-
-      <div id="login-step-vault" style="display:none;">
-        <h2 id="vault-title-text" class="card-title" style="margin-bottom:6px;">Crea tu Contraseña Maestra</h2>
-        <p id="vault-subtitle-text" class="item-sub" style="margin-bottom:16px;"></p>
-
-        <form id="vault-form" class="list-stack">
-          <input type="hidden" id="vault-mode" value="create" />
-          <div class="pw-wrap">
-            <input id="vault-password-input" class="input" type="password" autocomplete="new-password" minlength="8" placeholder="Contraseña maestra (mín. 8 caracteres)" required />
-            <button type="button" id="toggle-vault-pw" class="pw-toggle-btn">Mostrar</button>
+      <div class="login-card">
+        <!-- Paso 1: Login tradicional con correo/contraseña o Google -->
+        <div id="login-step-auth">
+          <div class="auth-tabs" role="tablist">
+            <button type="button" id="tab-auth-login" class="auth-tab-btn active" data-auth-mode="login">Iniciar sesión</button>
+            <button type="button" id="tab-auth-register" class="auth-tab-btn" data-auth-mode="register">Crear cuenta</button>
           </div>
-          <div id="vault-confirm-wrap" class="pw-wrap">
-            <input id="vault-confirm-input" class="input" type="password" autocomplete="new-password" minlength="8" placeholder="Confirma tu contraseña maestra" required />
-          </div>
-          <button id="btn-vault-action" type="submit" class="btn btn-primary" style="width:100%;">Crear contraseña y entrar</button>
-          <button id="btn-switch-google" type="button" class="btn btn-outline" style="width:100%;">Usar otra cuenta de Google</button>
-        </form>
+
+          <form id="email-auth-form" class="list-stack">
+            <input type="hidden" id="email-auth-mode" value="login" />
+            <div id="auth-name-wrap" style="display:none;">
+              <input id="auth-name-input" class="input" type="text" autocomplete="name" placeholder="Tu nombre o apodo" style="width:100%;" />
+            </div>
+            <input id="auth-email-input" class="input" type="email" autocomplete="email" placeholder="Correo electrónico" required />
+            <div class="pw-wrap">
+              <input id="auth-password-input" class="input" type="password" autocomplete="current-password" minlength="6" placeholder="Contraseña (mín. 6 caracteres)" required />
+              <button type="button" id="toggle-auth-pw" class="pw-toggle-btn">Mostrar</button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;">
+              <button type="button" id="btn-forgot-password" style="background:none;border:none;color:var(--sky-primary);font-size:0.82rem;font-weight:600;cursor:pointer;">¿Olvidaste tu contraseña?</button>
+            </div>
+            <button id="btn-email-auth-submit" type="submit" class="btn btn-primary" style="width:100%;">Entrar a mi cuenta</button>
+          </form>
+
+          <div class="auth-divider">o continúa con</div>
+
+          <button id="btn-google-login" type="button" class="btn btn-outline" style="width:100%;">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35 11.1h-9.17v2.73h5.51c-.24 1.38-1.04 2.55-2.22 3.33v2.77h3.59c2.1-1.93 3.31-4.78 3.31-8.17 0-.74-.07-1.45-.22-2.13z"/><path fill="currentColor" d="M12.18 21.35c3.01 0 5.54-.99 7.38-2.69l-3.59-2.77c-.99.66-2.25 1.05-3.79 1.05-2.91 0-5.38-1.97-6.26-4.63H2.17v2.85c1.83 3.63 5.55 6.19 10.01 6.19z"/><path fill="currentColor" d="M5.92 12.31c-.22-.66-.35-1.36-.35-2.31s.13-1.65.35-2.31V4.84H2.17C1.43 6.32 1 8 1 9.8s.43 3.48 1.17 4.96l3.75-2.45z"/><path fill="currentColor" d="M12.18 5.75c1.64 0 3.11.56 4.27 1.66l3.2-3.2C17.72 2.45 15.19 1.5 12.18 1.5 7.72 1.5 4 4.06 2.17 7.69l3.75 2.85c.88-2.66 3.35-4.79 6.26-4.79z"/></svg>
+            Continuar con Google
+          </button>
+        </div>
+
+        <!-- Paso 2: Contraseña maestra para cuentas Google (solo si aún no se guarda en el dispositivo) -->
+        <div id="login-step-vault" style="display:none;">
+          <h2 id="vault-title-text" class="card-title" style="margin-bottom:6px;">Configura tu Bóveda Cifrada</h2>
+          <p id="vault-subtitle-text" class="item-sub" style="margin-bottom:16px;"></p>
+
+          <form id="vault-form" class="list-stack">
+            <input type="hidden" id="vault-mode" value="create" />
+            <div class="pw-wrap">
+              <input id="vault-password-input" class="input" type="password" autocomplete="new-password" minlength="6" placeholder="Contraseña de bóveda (mín. 6 caracteres)" required />
+              <button type="button" id="toggle-vault-pw" class="pw-toggle-btn">Mostrar</button>
+            </div>
+            <div id="vault-confirm-wrap" class="pw-wrap">
+              <input id="vault-confirm-input" class="input" type="password" autocomplete="new-password" minlength="6" placeholder="Confirma tu contraseña" required />
+            </div>
+            <button id="btn-vault-action" type="submit" class="btn btn-primary" style="width:100%;">Guardar y entrar</button>
+            <button id="btn-switch-google" type="button" class="btn btn-outline" style="width:100%;">Volver al inicio de sesión</button>
+          </form>
+        </div>
       </div>
     </div>
   </section>
 
+  <!-- APLICACIÓN PRINCIPAL -->
   <div id="app-shell" class="app-container" style="display:none;">
     <header class="topbar">
       <div class="brand-group">
@@ -65,37 +106,38 @@
         </div>
       </div>
       <div class="topbar-controls">
-        <button type="button" id="btn-install-mobile-app" class="btn btn-soft btn-sm">Instalar App</button>
-        <button type="button" data-open-quick-task class="btn btn-primary btn-sm">+ Tarea</button>
-        <button type="button" data-toggle-theme class="btn btn-outline btn-sm">Oscuro</button>
+        <button type="button" id="btn-install-mobile-app" class="btn btn-soft btn-sm">Descargar App</button>
+        <button type="button" data-open-quick-task class="btn btn-primary btn-sm">+ Entrega</button>
+        <button type="button" data-toggle-theme class="btn btn-outline btn-sm">Modo oscuro</button>
       </div>
     </header>
 
     <nav class="desktop-tabs" aria-label="Secciones principales">
-      <button class="tab-btn active" data-tab="hoy">Hoy</button>
-      <button class="tab-btn" data-tab="agenda">Agenda</button>
-      <button class="tab-btn" data-tab="tareas">Tareas y Hábitos</button>
-      <button class="tab-btn" data-tab="correos">Correos</button>
-      <button class="tab-btn" data-tab="espacio">Mi Espacio</button>
+      <button id="nav-hoy-trigger" class="tab-btn active" data-tab="hoy">Hoy</button>
+      <button id="nav-agenda-trigger" class="tab-btn" data-tab="agenda">Agenda Semanal</button>
+      <button id="nav-tareas-trigger" class="tab-btn" data-tab="tareas">Tareas y Hábitos</button>
+      <button id="nav-correos-trigger" class="tab-btn" data-tab="correos">Correos</button>
+      <button id="nav-espacio-trigger" class="tab-btn" data-tab="espacio">Mi Espacio</button>
     </nav>
 
+    <!-- VISTA: HOY (SOLO LO IMPORTANTE Y URGENTE) -->
     <main id="panel-hoy" class="view-panel active">
       <section class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Bloques hoy</div>
+          <div id="stat-today-blocks" class="stat-num">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Entregas urgentes</div>
+          <div id="stat-pending" class="stat-num">0</div>
+        </div>
         <div class="stat-box">
           <div class="stat-label">Hábitos hoy</div>
           <div id="stat-habits" class="stat-num">0 / 0</div>
         </div>
         <div class="stat-box">
-          <div class="stat-label">Mejor racha</div>
-          <div id="stat-streak" class="stat-num">0 días</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Cumplimiento</div>
-          <div id="stat-rate" class="stat-num">0%</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Pendientes</div>
-          <div id="stat-pending" class="stat-num">0</div>
+          <div class="stat-label">Correos importantes</div>
+          <div id="stat-important-mails" class="stat-num">0</div>
         </div>
       </section>
 
@@ -103,204 +145,204 @@
         <div>
           <div class="card">
             <div class="card-head">
-              <h2 class="card-title">Pendientes rápidos</h2>
-              <button type="button" data-open-quick-task class="btn btn-soft btn-sm">+ Agregar</button>
+              <h2 class="card-title">Agenda de hoy</h2>
+              <button type="button" data-tab="agenda" class="btn btn-soft btn-sm">Ver semana</button>
             </div>
-            <div id="hoy-tasks-list" class="list-stack"></div>
+            <div id="hoy-agenda-list" class="list-stack"></div>
           </div>
 
-          <div class="card card-peach">
+          <div class="card">
             <div class="card-head">
-              <h2 class="card-title">Hábitos del día</h2>
+              <h2 class="card-title">Entregas y pendientes clave</h2>
+              <button type="button" data-open-quick-task class="btn btn-soft btn-sm">+ Nueva</button>
             </div>
-            <div id="hoy-habits-list" class="list-stack"></div>
+            <div id="hoy-tasks-list" class="list-stack"></div>
           </div>
         </div>
 
         <div>
+          <div class="card card-peach">
+            <div class="card-head">
+              <h2 class="card-title">Hábitos del día</h2>
+              <span id="stat-streak" class="streak-pill">🔥 0d</span>
+            </div>
+            <div id="hoy-habits-list" class="list-stack"></div>
+          </div>
+
           <div class="card">
             <div class="card-head">
-              <h2 class="card-title">Bloques de hoy</h2>
+              <h2 class="card-title">Correos importantes recientes</h2>
+              <button type="button" data-tab="correos" class="btn btn-soft btn-sm">Ir a correos</button>
             </div>
-            <div id="hoy-agenda-list" class="list-stack"></div>
+            <div id="hoy-important-mails-list" class="list-stack"></div>
           </div>
         </div>
       </div>
     </main>
 
+    <!-- VISTA: AGENDA SEMANAL (LUNES A DOMINGO POR BLOQUES) -->
     <section id="panel-agenda" class="view-panel">
       <div class="card">
         <div class="card-head">
-          <h2 class="card-title">Agenda: bloques temporales y permanentes</h2>
-        </div>
-        <form id="agenda-form" class="list-stack" style="margin-bottom:14px;">
-          <div class="form-inline" style="margin-bottom:0;">
-            <select id="agenda-recurrence" class="select" style="max-width:170px;">
-              <option value="temporary" selected>Temporal (fecha)</option>
-              <option value="permanent">Permanente (días)</option>
-            </select>
-            <input id="agenda-date" class="input" type="date" style="max-width:165px;" required />
-            <input id="agenda-time" class="input" type="time" style="max-width:130px;" title="Hora inicio" required />
-            <input id="agenda-end-time" class="input" type="time" style="max-width:130px;" title="Hora fin (opcional)" />
-            <input id="agenda-title" class="input" type="text" placeholder="Actividad, clase o bloque..." required />
-            <input id="agenda-color" class="custom-color-input" type="color" value="#4A93C6" title="Color del bloque" />
-            <button type="submit" class="btn btn-primary">Agendar</button>
+          <div>
+            <h2 class="card-title">Agenda Semanal (Lunes a Domingo)</h2>
+            <p id="week-range-subtitle" class="item-sub"></p>
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" id="btn-prev-week" class="btn btn-outline btn-sm">← Anterior</button>
+            <button type="button" id="btn-this-week" class="btn btn-soft btn-sm">Esta semana</button>
+            <button type="button" id="btn-next-week" class="btn btn-outline btn-sm">Siguiente →</button>
+            <button type="button" id="btn-open-new-block" class="btn btn-primary btn-sm">+ Bloque</button>
+          </div>
+        </div>
 
-          <div id="agenda-days-picker" class="color-picker-row" style="display:none;">
-            <span class="item-sub">Días permanentes:</span>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="1" checked /> Lun</label>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="2" checked /> Mar</label>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="3" checked /> Mié</label>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="4" checked /> Jue</label>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="5" checked /> Vie</label>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="6" /> Sáb</label>
-            <label class="btn btn-outline btn-sm"><input type="checkbox" data-new-day="0" /> Dom</label>
+        <!-- Selector rápido de días en celular -->
+        <div id="mobile-week-pills" class="mobile-day-pills"></div>
+
+        <!-- Tablero de 7 columnas (Lun - Dom) -->
+        <div id="week-grid-board" class="week-grid-board"></div>
+      </div>
+    </section>
+
+    <!-- VISTA: TAREAS EN BLOQUES CON ENTREGA + HÁBITOS -->
+    <section id="panel-tareas" class="view-panel">
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Tareas y Entregas en Bloques</h2>
+        </div>
+        <form id="task-form" class="list-stack" style="margin-bottom:16px;">
+          <div class="form-inline" style="margin-bottom:0;">
+            <input id="task-title-input" class="input" type="text" placeholder="¿Qué tarea o entrega tienes?" required />
+            <input id="task-due-date" class="input" type="date" style="max-width:165px;" title="Día de entrega" />
+            <input id="task-due-time" class="input" type="time" style="max-width:135px;" title="Hora de entrega" />
+            <select id="task-prio-input" class="select" style="max-width:130px;">
+              <option value="alta">Alta</option>
+              <option value="media" selected>Media</option>
+              <option value="baja">Baja</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Crear bloque</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="item-sub">Color del bloque:</span>
+            <div id="task-color-swatches" class="color-swatches-bar"></div>
           </div>
         </form>
-        <div id="agenda-full-list" class="list-stack"></div>
-      </div>
-    </section>
 
-    <section id="panel-tareas" class="view-panel">
+        <div id="tasks-full-list" class="tasks-blocks-grid"></div>
+      </div>
+
       <div class="grid-2col">
-        <div class="card">
+        <div class="card card-peach">
           <div class="card-head">
-            <h2 class="card-title">Tareas por color</h2>
+            <h2 class="card-title">Hábitos diarios y rachas</h2>
           </div>
-          <form id="task-form" class="list-stack" style="margin-bottom:14px;">
-            <div class="form-inline" style="margin-bottom:0;">
-              <input id="task-title-input" class="input" type="text" placeholder="Nueva tarea..." required />
-              <select id="task-prio-input" class="select" style="max-width:135px;">
-                <option value="alta">Alta</option>
-                <option value="media" selected>Media</option>
-                <option value="baja">Baja</option>
-              </select>
-              <button type="submit" class="btn btn-primary">Agregar</button>
-            </div>
-            <div class="color-picker-row">
-              <span class="item-sub">Color:</span>
-              <div id="task-color-swatches" class="color-picker-row"></div>
-            </div>
+          <form id="habit-form" class="form-inline">
+            <input id="habit-title-input" class="input" type="text" placeholder="Nuevo hábito diario..." required />
+            <select id="habit-cat-input" class="select" style="max-width:135px;">
+              <option value="Salud">Salud</option>
+              <option value="Enfoque">Enfoque</option>
+              <option value="Estudio">Estudio</option>
+              <option value="Personal">Personal</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Agregar</button>
           </form>
-          <div id="tasks-full-list" class="list-stack"></div>
+          <div id="habits-full-list" class="list-stack"></div>
         </div>
 
-        <div>
-          <div class="card">
-            <div class="pomo-panel">
-              <div id="pomo-task-label" style="font-size:0.85rem;opacity:0.9;">Sesión libre de enfoque</div>
-              <div id="pomo-clock" class="pomo-clock">25:00</div>
-              <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
-                <button id="pomo-start" type="button" class="btn btn-peach btn-sm">Iniciar</button>
-                <button id="pomo-pause" type="button" class="btn btn-soft btn-sm">Pausar</button>
-                <button id="pomo-reset" type="button" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,0.4);">Reiniciar</button>
-              </div>
+        <div class="card">
+          <div class="pomo-panel">
+            <div id="pomo-task-label" style="font-size:0.86rem;opacity:0.92;">Sesión libre de enfoque</div>
+            <div id="pomo-clock" class="pomo-clock">25:00</div>
+            <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+              <button id="pomo-start" type="button" class="btn btn-peach btn-sm">Iniciar</button>
+              <button id="pomo-pause" type="button" class="btn btn-soft btn-sm">Pausar</button>
+              <button id="pomo-reset" type="button" class="btn btn-outline btn-sm" style="color:#fff;border-color:rgba(255,255,255,0.45);">Reiniciar</button>
             </div>
-          </div>
-
-          <div class="card card-peach">
-            <div class="card-head">
-              <h2 class="card-title">Hábitos diarios y rachas</h2>
-            </div>
-            <form id="habit-form" class="form-inline">
-              <input id="habit-title-input" class="input" type="text" placeholder="Nuevo hábito..." required />
-              <select id="habit-cat-input" class="select" style="max-width:135px;">
-                <option value="Salud">Salud</option>
-                <option value="Enfoque">Enfoque</option>
-                <option value="Descanso">Descanso</option>
-                <option value="Personal">Personal</option>
-              </select>
-              <button type="submit" class="btn btn-primary">Crear</button>
-            </form>
-            <div id="habits-full-list" class="list-stack"></div>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- VISTA: CORREOS POR SESIÓN DE CUENTA, RANGO 1-12 MESES Y BUSCADOR -->
     <section id="panel-correos" class="view-panel">
       <div class="card">
-        <div class="card-head" style="flex-wrap:wrap;">
-          <h2 class="card-title">Administrador de correos Gmail</h2>
+        <div class="card-head">
+          <div>
+            <h2 class="card-title">Organizador Multi-Cuenta de Correos</h2>
+            <p class="item-sub">Cambia entre sesiones de cada cuenta conectada y filtra tus importantes</p>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btn-connect-google-mail" type="button" class="btn btn-primary btn-sm">Conectar Gmail</button>
-            <button id="btn-sync-gmail" type="button" class="btn btn-soft btn-sm">Sincronizar ahora</button>
-            <button id="btn-clean-spam" type="button" class="btn btn-peach btn-sm">Borrar spam (<span id="mail-count-spam">0</span>)</button>
+            <button id="btn-open-connect-mail" type="button" class="btn btn-primary btn-sm">+ Agregar cuenta</button>
+            <button id="btn-sync-gmail" type="button" class="btn btn-soft btn-sm">Actualizar</button>
+            <button id="btn-clean-spam" type="button" class="btn btn-peach btn-sm">Limpiar spam (<span id="mail-count-spam">0</span>)</button>
           </div>
         </div>
 
-        <div id="connected-accounts-list" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <!-- Barra de sesiones por cuenta conectada -->
+        <div id="mail-sessions-bar" class="mail-sessions-bar"></div>
 
-        <div class="form-inline">
-          <button type="button" class="btn btn-outline btn-sm active" data-mail-view="all">Recibidos (<span id="mail-count-all">0</span>)</button>
-          <button type="button" class="btn btn-outline btn-sm" data-mail-view="important">Importantes (<span id="mail-count-important">0</span>)</button>
-          <button type="button" class="btn btn-outline btn-sm" data-mail-view="spam">Spam</button>
-          <select id="mail-filter-account" class="select" style="max-width:250px;">
-            <option value="all">Todas las cuentas</option>
+        <!-- Búsqueda rápida + Rango de meses (1 a 12) -->
+        <div class="form-inline" style="margin-bottom:12px;">
+          <input id="mail-quick-search" class="input" type="search" placeholder="Buscar rápido por remitente, asunto o palabra clave..." />
+          <select id="mail-months-range" class="select" style="max-width:195px;" title="Antigüedad de correos">
+            <option value="1">Último 1 mes</option>
+            <option value="2">Últimos 2 meses</option>
+            <option value="3">Últimos 3 meses</option>
+            <option value="6">Últimos 6 meses</option>
+            <option value="9">Últimos 9 meses</option>
+            <option value="12">Últimos 12 meses</option>
           </select>
         </div>
 
-        <form id="mail-add-form" class="form-inline">
-          <input id="mail-sender" class="input" type="text" placeholder="Remitente o etiqueta..." required />
-          <input id="mail-subject" class="input" type="text" placeholder="Nota o recordatorio de correo..." required />
-          <label class="btn btn-outline btn-sm" style="cursor:pointer;">
-            <input id="mail-important-check" type="checkbox" /> Importante
-          </label>
-          <button type="submit" class="btn btn-soft">Guardar nota</button>
-        </form>
+        <!-- Pestañas de carpeta -->
+        <div class="form-inline" style="margin-bottom:14px;">
+          <button type="button" class="btn btn-outline btn-sm active" data-mail-view="all">Bandeja (<span id="mail-count-all">0</span>)</button>
+          <button type="button" class="btn btn-outline btn-sm" data-mail-view="important">Importantes (<span id="mail-count-important">0</span>)</button>
+          <button type="button" class="btn btn-outline btn-sm" data-mail-view="spam">Spam</button>
+        </div>
 
         <div id="mail-messages-list" class="list-stack"></div>
       </div>
     </section>
 
+    <!-- VISTA: MI ESPACIO -->
     <section id="panel-espacio" class="view-panel">
       <div class="grid-2col">
         <div>
           <div class="card">
             <div class="card-head">
-              <h2 class="card-title">Respaldo y notificaciones</h2>
+              <h2 class="card-title">Descarga Multiplataforma y Notificaciones</h2>
             </div>
             <div class="list-stack">
-              <label class="item-row">
+              <div class="item-row" style="flex-wrap:wrap;">
                 <div>
-                  <div class="item-title">Sincronización en la nube (Firestore)</div>
-                  <div class="item-sub">Automática al modificar datos</div>
+                  <div class="item-title">Instalar BrisaPlan en este dispositivo</div>
+                  <div class="item-sub">Funciona como app nativa en Android, iOS, Windows y Mac</div>
                 </div>
-                <input id="backup-days-input" class="input" type="number" min="7" step="1" value="7" style="max-width:90px;" />
-              </label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button id="btn-install-space" type="button" class="btn btn-primary btn-sm">Instalar App</button>
+                  <a id="btn-download-apk" href="https://github.com/tejon876/BrisaPlan/releases/latest/download/BrisaPlan.apk" target="_blank" rel="noopener" class="btn btn-soft btn-sm">APK Android</a>
+                </div>
+              </div>
 
               <div class="item-row">
                 <div>
-                  <div class="item-title">Notificaciones del dispositivo</div>
+                  <div class="item-title">Notificaciones y recordatorios</div>
                   <div id="notif-status-text" class="item-sub">Desactivadas</div>
                 </div>
-                <button id="btn-enable-notifs" type="button" class="btn btn-soft btn-sm">Activar</button>
+                <button id="btn-enable-notifs" type="button" class="btn btn-soft btn-sm">Activar permisos</button>
               </div>
             </div>
           </div>
 
           <div class="card card-peach">
             <div class="card-head">
-              <h2 class="card-title">Widgets y App Móvil en 1 clic</h2>
+              <h2 class="card-title">Tutorial Interactivo y Apoyo</h2>
             </div>
-            <p class="item-sub" style="margin-bottom:10px;">Elige qué módulos mostrar en tus widgets:</p>
-            <div class="list-stack" style="margin-bottom:14px;">
-              <label style="display:flex;align-items:center;gap:10px;font-size:0.9rem;cursor:pointer;">
-                <input id="w-chk-tasks" type="checkbox" style="width:18px;height:18px;" checked /> Widget 1: Tareas y Agenda
-              </label>
-              <label style="display:flex;align-items:center;gap:10px;font-size:0.9rem;cursor:pointer;">
-                <input id="w-chk-mail" type="checkbox" style="width:18px;height:18px;" checked /> Widget 2: Correos
-              </label>
-              <label style="display:flex;align-items:center;gap:10px;font-size:0.9rem;cursor:pointer;">
-                <input id="w-chk-habits" type="checkbox" style="width:18px;height:18px;" checked /> Widget 3: Hábitos y Rachas
-              </label>
-            </div>
-
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              <button id="btn-open-widget-setup" type="button" class="btn btn-primary">Configurar widgets con botones</button>
-              <a id="btn-download-apk" href="https://github.com/tejon876/BrisaPlan/releases/latest/download/BrisaPlan.apk" target="_blank" rel="noopener" class="btn btn-soft">Descargar APK Android</a>
-              <a href="widgets/desktop-wallpaper.html" target="_blank" class="btn btn-outline">Widget Cristal</a>
+            <p class="item-sub" style="margin-bottom:14px;">Recorre cada función de BrisaPlan paso a paso con el tour visual guiado.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+              <button id="btn-open-tutorial" type="button" class="btn btn-primary">Iniciar tour interactivo</button>
+              <a id="paypal-donate-btn" href="https://paypal.me/jmatat8" target="_blank" rel="noopener" class="btn btn-peach">Apoyar proyecto</a>
             </div>
           </div>
         </div>
@@ -308,22 +350,11 @@
         <div>
           <div class="card">
             <div class="card-head">
-              <h2 class="card-title">Apoyo y Tutorial</h2>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;">
-              <a id="paypal-donate-btn" href="https://paypal.me/jmatat8" target="_blank" rel="noopener" class="btn btn-peach">Apoyar con PayPal</a>
-              <button id="btn-open-tutorial" type="button" class="btn btn-soft">Ver tutorial guiado</button>
-              <button id="btn-logout-only" type="button" class="btn btn-primary">Bloquear sesión</button>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head">
-              <h2 class="card-title">Privacidad y Seguridad</h2>
+              <h2 class="card-title">Seguridad y Sesión Persistente</h2>
             </div>
             <p id="arco-legal-text" class="item-sub" style="margin-bottom:14px;"></p>
             <div style="display:flex;flex-wrap:wrap;gap:10px;">
-              <button id="btn-delete-arco" type="button" class="btn btn-outline" style="color:#E11D48;border-color:#FDA4AF;">Cerrar y limpiar sesión</button>
+              <button id="btn-logout-only" type="button" class="btn btn-outline" style="color:#E11D48;border-color:#FDA4AF;">Cerrar sesión</button>
             </div>
           </div>
         </div>
@@ -331,6 +362,7 @@
     </section>
   </div>
 
+  <!-- BARRA INFERIOR MÓVIL -->
   <nav class="mobile-bottom-nav" aria-label="Menú móvil">
     <button class="mobile-nav-btn active" data-tab="hoy">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
@@ -354,92 +386,160 @@
     </button>
   </nav>
 
-  <div id="edit-agenda-modal" class="modal-overlay">
+  <!-- MODAL: CREAR / EDITAR BLOQUE DE AGENDA SEMANAL -->
+  <div id="block-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="card-head">
-        <h3 class="card-title">Editar bloque de agenda</h3>
-        <button id="close-edit-agenda" type="button" class="btn-icon-del">✕</button>
+        <h3 id="block-modal-title" class="card-title">Nuevo bloque en agenda</h3>
+        <button id="close-block-modal" type="button" class="btn-icon-del">✕</button>
       </div>
-      <form id="edit-agenda-form" class="list-stack">
-        <input type="hidden" id="edit-agenda-id" />
-        <input id="edit-agenda-title" class="input" type="text" placeholder="Nombre de la actividad..." required />
+      <form id="block-form" class="list-stack">
+        <input type="hidden" id="block-id" />
+        <input id="block-title" class="input" type="text" placeholder="Nombre de clase, trabajo o actividad..." required />
+
         <div class="form-inline" style="margin-bottom:0;">
-          <input id="edit-agenda-time" class="input" type="time" required />
-          <input id="edit-agenda-end" class="input" type="time" />
-          <input id="edit-agenda-color" class="custom-color-input" type="color" value="#4A93C6" />
+          <div style="flex:1;">
+            <label class="item-sub" style="display:block;margin-bottom:4px;">Inicio</label>
+            <input id="block-start" class="input" type="time" value="08:00" style="width:100%;" required />
+          </div>
+          <div style="flex:1;">
+            <label class="item-sub" style="display:block;margin-bottom:4px;">Fin</label>
+            <input id="block-end" class="input" type="time" value="09:00" style="width:100%;" />
+          </div>
         </div>
-        <select id="edit-agenda-recurrence" class="select">
-          <option value="temporary">Temporal (fecha específica)</option>
-          <option value="permanent">Permanente (días recurrentes)</option>
-        </select>
-        <div id="edit-agenda-date-wrap">
-          <input id="edit-agenda-date" class="input" type="date" style="width:100%;" />
+
+        <div>
+          <label class="item-sub" style="display:block;margin-bottom:6px;">Días de la semana</label>
+          <div id="block-days-bar" style="display:flex;gap:6px;flex-wrap:wrap;">
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="1" /> Lun</label>
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="2" /> Mar</label>
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="3" /> Mié</label>
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="4" /> Jue</label>
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="5" /> Vie</label>
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="6" /> Sáb</label>
+            <label class="btn btn-outline btn-sm"><input type="checkbox" data-block-day="0" /> Dom</label>
+          </div>
         </div>
-        <div id="edit-agenda-days-wrap" class="color-picker-row" style="display:none;">
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="1" /> Lun</label>
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="2" /> Mar</label>
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="3" /> Mié</label>
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="4" /> Jue</label>
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="5" /> Vie</label>
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="6" /> Sáb</label>
-          <label class="btn btn-outline btn-sm"><input type="checkbox" data-edit-day="0" /> Dom</label>
+
+        <label class="switch-row">
+          <div>
+            <div class="item-title" style="font-size:0.9rem;">Bloque permanente (cada semana)</div>
+            <div id="block-recurrence-hint" class="item-sub">Se repetirá automáticamente en los días marcados</div>
+          </div>
+          <input id="block-permanent-toggle" type="checkbox" style="width:20px;height:20px;" checked />
+        </label>
+
+        <div id="block-single-date-wrap" style="display:none;">
+          <label class="item-sub" style="display:block;margin-bottom:4px;">Fecha específica</label>
+          <input id="block-date" class="input" type="date" style="width:100%;" />
         </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;">Guardar cambios</button>
+
+        <div>
+          <label class="item-sub" style="display:block;margin-bottom:6px;">Color del bloque (o abre la ruleta)</label>
+          <div id="block-color-swatches" class="color-swatches-bar"></div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button type="submit" class="btn btn-primary" style="flex:1;">Guardar bloque</button>
+          <button type="button" id="btn-delete-block" class="btn btn-outline" style="display:none;color:#E11D48;border-color:#FDA4AF;">Eliminar</button>
+        </div>
       </form>
     </div>
   </div>
 
-  <div id="widget-assistant-modal" class="modal-overlay">
+  <!-- MODAL: CONECTAR CUENTA DE CORREO CON VERIFICACIÓN PROFESIONAL -->
+  <div id="connect-mail-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="card-head">
-        <h3 id="widget-modal-title" class="card-title">Configurar Widgets sin complicaciones</h3>
-        <button id="close-widget-modal" type="button" class="btn-icon-del">✕</button>
+        <h3 class="card-title">Vincular cuenta de correo</h3>
+        <button id="close-connect-mail" type="button" class="btn-icon-del">✕</button>
       </div>
-      <p class="item-sub" style="margin-bottom:14px;">Solo presiona los botones en orden y aprueba los permisos cuando aparezcan:</p>
-      <div class="list-stack">
-        <button type="button" class="btn btn-primary" data-widget-action="widgets-all" style="width:100%;">1. Activar todos los widgets de un toque</button>
-        <button type="button" class="btn btn-soft" data-widget-action="notif" style="width:100%;">2. Pedir permiso de notificaciones</button>
-        <button type="button" class="btn btn-peach" data-widget-action="open-glass" style="width:100%;">3. Abrir vista de widget cristal</button>
+      <p class="item-sub" style="margin-bottom:12px;">
+        Al conectar tu cuenta, Google te pedirá autorizar el acceso seguro y <strong>te enviaremos un correo oficial de confirmación</strong> para validar la vinculación.
+      </p>
+      <div class="list-stack" style="margin-bottom:14px;">
+        <input id="connect-mail-label" class="input" type="text" placeholder="Nombre de sesión (ej. Escuela, Trabajo, Personal)" />
+        <input id="connect-mail-hint" class="input" type="email" placeholder="Correo Gmail a vincular (opcional)" />
+        <label class="switch-row">
+          <div>
+            <div class="item-title" style="font-size:0.88rem;">Enviar correo de confirmación y permiso</div>
+            <div class="item-sub">Recibirás un aviso en tu bandeja para verificar</div>
+          </div>
+          <input id="connect-mail-verify-check" type="checkbox" style="width:19px;height:19px;" checked />
+        </label>
       </div>
-      <p class="item-sub" style="margin-top:14px;">Tip en celular: si tu navegador muestra el menú de arriba/abajo, toca <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar aplicación"</strong>.</p>
+      <button id="btn-confirm-connect-gmail" type="button" class="btn btn-primary" style="width:100%;">
+        Continuar y autorizar acceso
+      </button>
     </div>
   </div>
 
+  <!-- MODAL: NUEVA ENTREGA RÁPIDA -->
   <div id="quick-task-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="card-head">
-        <h3 class="card-title">Nueva tarea rápida</h3>
+        <h3 class="card-title">Nueva tarea o entrega</h3>
         <button id="close-quick-task" type="button" class="btn-icon-del">✕</button>
       </div>
       <form id="quick-task-form" class="list-stack">
-        <input id="quick-task-title" class="input" type="text" placeholder="¿Qué necesitas hacer?" required />
+        <input id="quick-task-title" class="input" type="text" placeholder="Nombre de la tarea o entrega..." required />
         <div class="form-inline" style="margin-bottom:0;">
-          <select id="quick-task-prio" class="select">
-            <option value="alta">Prioridad Alta</option>
-            <option value="media" selected>Prioridad Media</option>
-            <option value="baja">Prioridad Baja</option>
-          </select>
-          <input id="quick-task-color" class="custom-color-input" type="color" value="#4A93C6" title="Color de tarea" />
+          <div style="flex:1;">
+            <label class="item-sub" style="display:block;margin-bottom:4px;">Día de entrega</label>
+            <input id="quick-task-date" class="input" type="date" style="width:100%;" />
+          </div>
+          <div style="flex:1;">
+            <label class="item-sub" style="display:block;margin-bottom:4px;">Hora límite</label>
+            <input id="quick-task-time" class="input" type="time" style="width:100%;" />
+          </div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;cursor:pointer;flex-wrap:wrap;">
-          <input id="quick-task-agenda-check" type="checkbox" style="width:18px;height:18px;" /> Agendar hoy a las:
-          <input id="quick-task-time" class="input" type="time" value="10:00" style="max-width:130px;" />
-        </label>
-        <button type="submit" class="btn btn-primary" style="width:100%;">Guardar tarea</button>
+        <select id="quick-task-prio" class="select">
+          <option value="alta">Prioridad Alta</option>
+          <option value="media" selected>Prioridad Media</option>
+          <option value="baja">Prioridad Baja</option>
+        </select>
+        <div>
+          <label class="item-sub" style="display:block;margin-bottom:6px;">Color</label>
+          <div id="quick-task-swatches" class="color-swatches-bar"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Guardar entrega</button>
       </form>
     </div>
   </div>
 
-  <div id="tutorial-modal" class="modal-overlay">
+  <!-- MODAL: GUÍA DE INSTALACIÓN MULTIPLATAFORMA -->
+  <div id="install-guide-modal" class="modal-overlay">
     <div class="modal-box">
       <div class="card-head">
-        <h3 id="tut-title" class="card-title"></h3>
-        <span id="tut-counter" class="item-sub"></span>
+        <h3 class="card-title">Descargar e Instalar BrisaPlan</h3>
+        <button id="close-install-modal" type="button" class="btn-icon-del">✕</button>
       </div>
-      <p id="tut-body" class="item-sub" style="margin-bottom:18px;font-size:0.9rem;"></p>
-      <div style="display:flex;justify-content:flex-end;">
-        <button id="tut-next" type="button" class="btn btn-primary">Siguiente</button>
+      <div class="list-stack">
+        <div class="item-row" style="flex-direction:column;align-items:flex-start;">
+          <div class="item-title">Android / Windows / Mac (Instalación directa)</div>
+          <div class="item-sub">Abre el menú de tu navegador (⋮ o icono de computadora en la barra de direcciones) y selecciona <strong>"Instalar BrisaPlan"</strong> o <strong>"Agregar a pantalla principal"</strong>.</div>
+        </div>
+        <div class="item-row" style="flex-direction:column;align-items:flex-start;">
+          <div class="item-title">iPhone / iPad (Safari)</div>
+          <div class="item-sub">Toca el botón <strong>Compartir (□↑)</strong> en la barra inferior y elige <strong>"Agregar a inicio"</strong>.</div>
+        </div>
+        <a href="https://github.com/tejon876/BrisaPlan/releases/latest/download/BrisaPlan.apk" target="_blank" rel="noopener" class="btn btn-soft" style="width:100%;">Descargar paquete APK Android</a>
       </div>
+    </div>
+  </div>
+
+  <!-- TOUR INTERACTIVO SPOTLIGHT -->
+  <div id="tour-backdrop" class="tour-backdrop"></div>
+  <div id="tour-ring" class="tour-highlight-ring" style="display:none;"></div>
+  <div id="tour-popover" class="tour-popover" style="display:none;">
+    <div class="card-head" style="margin-bottom:8px;">
+      <h3 id="tut-title" class="card-title" style="font-size:0.98rem;"></h3>
+      <span id="tut-counter" class="item-sub"></span>
+    </div>
+    <p id="tut-body" class="item-sub" style="margin-bottom:16px;font-size:0.88rem;line-height:1.45;"></p>
+    <div style="display:flex;justify-content:space-between;gap:8px;">
+      <button id="tut-skip" type="button" class="btn btn-outline btn-sm">Omitir</button>
+      <button id="tut-next" type="button" class="btn btn-primary btn-sm">Siguiente</button>
     </div>
   </div>
 
