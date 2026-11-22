@@ -1,11 +1,10 @@
 import os, shutil
 
-# 1. Fixed debug keystore
 os.makedirs(os.path.expanduser("~/.android"), exist_ok=True)
-shutil.copy("native-android/brisaplan-debug.keystore", os.path.expanduser("~/.android/debug.keystore"))
-shutil.copy("native-android/brisaplan-debug.keystore", "android/app/debug.keystore")
+if os.path.exists("native-android/brisaplan-debug.keystore"):
+    shutil.copy("native-android/brisaplan-debug.keystore", os.path.expanduser("~/.android/debug.keystore"))
+    shutil.copy("native-android/brisaplan-debug.keystore", "android/app/debug.keystore")
 
-# 2. Enforce signingConfig in android/app/build.gradle
 gradle_path = "android/app/build.gradle"
 with open(gradle_path, "r", encoding="utf-8") as f:
     gradle = f.read()
@@ -27,7 +26,6 @@ if "storeFile file('debug.keystore')" not in gradle:
 with open(gradle_path, "w", encoding="utf-8") as f:
     f.write(gradle)
 
-# 3. Write pure Java Widgets & Plugin (works out-of-the-box without Kotlin plugin)
 pkg_dir = "android/app/src/main/java/com/brisaplan/app"
 res_dir = "android/app/src/main/res"
 os.makedirs(pkg_dir, exist_ok=True)
@@ -35,7 +33,6 @@ os.makedirs(f"{res_dir}/layout", exist_ok=True)
 os.makedirs(f"{res_dir}/drawable", exist_ok=True)
 os.makedirs(f"{res_dir}/xml", exist_ok=True)
 
-# Remove old .kt files if present
 for old_kt in ["BrisaPlanWidgetHoy.kt", "BrisaPlanWidgetAgenda.kt", "BrisaPlanWidgetHabits.kt", "BrisaWidgetBridge.kt", "BrisaPlanWidgetProvider.kt"]:
     p = f"{pkg_dir}/{old_kt}"
     if os.path.exists(p):
@@ -202,14 +199,173 @@ for fname, code in [
     with open(f"{pkg_dir}/{fname}", "w", encoding="utf-8") as f:
         f.write(code)
 
-# 4. Copy XML resources
-shutil.copy("native-android/widget_bg.xml", f"{res_dir}/drawable/widget_bg.xml")
-for lay in ["widget_hoy.xml", "widget_agenda.xml", "widget_habits.xml"]:
-    shutil.copy(f"native-android/{lay}", f"{res_dir}/layout/{lay}")
-for inf in ["widget_info_hoy.xml", "widget_info_agenda.xml", "widget_info_habits.xml"]:
-    shutil.copy(f"native-android/{inf}", f"{res_dir}/xml/{inf}")
+widget_bg_xml = """<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#101015" />
+    <stroke android:width="1dp" android:color="#2E3748" />
+    <corners android:radius="20dp" />
+</shape>
+"""
 
-# 5. Register BrisaWidgetBridge in MainActivity.java
+widget_hoy_xml = """<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_hoy_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="BRISAPLAN • HOY"
+        android:textColor="#93C5FD"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/w_hoy_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Todo al día • 0 pendientes"
+        android:textColor="#F8FAFC"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/w_hoy_sub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Toca para abrir BrisaPlan"
+        android:textColor="#94A3B8"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+</LinearLayout>
+"""
+
+widget_agenda_xml = """<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_ag_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="BRISAPLAN • AGENDA"
+        android:textColor="#FED7AA"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/w_ag_line1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Sin bloques programados hoy"
+        android:textColor="#F8FAFC"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/w_ag_line2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Agenda semanal lista"
+        android:textColor="#94A3B8"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+</LinearLayout>
+"""
+
+widget_habits_xml = """<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_hab_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="BRISAPLAN • RACHAS"
+        android:textColor="#6EE7B7"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/w_hab_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Racha activa: 0 días"
+        android:textColor="#F8FAFC"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/w_hab_sub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Mantén tu ritmo diario"
+        android:textColor="#94A3B8"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+</LinearLayout>
+"""
+
+widget_info_xml = """<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="72dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_hoy"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />
+"""
+
+widget_info_agenda_xml = widget_info_xml.replace("@layout/widget_hoy", "@layout/widget_agenda")
+widget_info_habits_xml = widget_info_xml.replace("@layout/widget_hoy", "@layout/widget_habits")
+
+with open(f"{res_dir}/drawable/widget_bg.xml", "w", encoding="utf-8") as f:
+    f.write(widget_bg_xml)
+with open(f"{res_dir}/layout/widget_hoy.xml", "w", encoding="utf-8") as f:
+    f.write(widget_hoy_xml)
+with open(f"{res_dir}/layout/widget_agenda.xml", "w", encoding="utf-8") as f:
+    f.write(widget_agenda_xml)
+with open(f"{res_dir}/layout/widget_habits.xml", "w", encoding="utf-8") as f:
+    f.write(widget_habits_xml)
+with open(f"{res_dir}/xml/widget_info_hoy.xml", "w", encoding="utf-8") as f:
+    f.write(widget_info_xml)
+with open(f"{res_dir}/xml/widget_info_agenda.xml", "w", encoding="utf-8") as f:
+    f.write(widget_info_agenda_xml)
+with open(f"{res_dir}/xml/widget_info_habits.xml", "w", encoding="utf-8") as f:
+    f.write(widget_info_habits_xml)
+
 main_java = f"{pkg_dir}/MainActivity.java"
 if os.path.exists(main_java):
     with open(main_java, "r", encoding="utf-8") as f:
@@ -222,7 +378,6 @@ if os.path.exists(main_java):
         with open(main_java, "w", encoding="utf-8") as f:
             f.write(mj)
 
-# 6. Add server_client_id to strings.xml
 strings_path = f"{res_dir}/values/strings.xml"
 with open(strings_path, "r", encoding="utf-8") as f:
     s_xml = f.read()
@@ -231,7 +386,6 @@ if "server_client_id" not in s_xml:
     with open(strings_path, "w", encoding="utf-8") as f:
         f.write(s_xml)
 
-# 7. Inject Permissions & 3 Widget Receivers into AndroidManifest.xml
 manifest_path = "android/app/src/main/AndroidManifest.xml"
 with open(manifest_path, "r", encoding="utf-8") as f:
     manifest = f.read()

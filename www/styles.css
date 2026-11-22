@@ -345,7 +345,6 @@ input[type="color"] {
   display: block;
 }
 
-/* FLOATING WIDGET PREVIEW & SELECTOR */
 .widget-preview-stage {
   background: radial-gradient(circle at top right, rgba(147, 197, 253, 0.18), rgba(254, 215, 170, 0.12)), #09090d;
   border: 1px solid rgba(255, 255, 255, 0.14);
