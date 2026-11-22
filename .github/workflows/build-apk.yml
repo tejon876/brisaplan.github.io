@@ -1,17 +1,15 @@
-name: Build Android APK (BrisaPlan)
+name: Build BrisaPlan Android APK
 
 on:
   push:
-    branches: [ "main", "master" ]
-  release:
-    types: [ created, published ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-apk:
+  build-android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -22,68 +20,40 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Java 21
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
-      - name: Prepare www bundle for Capacitor
+      - name: Install Capacitor & Build Android Project
         run: |
-          mkdir -p www
-          cp -r index.html manifest.json sw.js css js www/
-          if [ -d "widgets" ]; then cp -r widgets www/; fi
-
-      - name: Initialize Capacitor and build APK
-        run: |
-          npm init -y
-          npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
-          npx cap add android || true
-          npx cap copy android
-          python3 - << 'PYEOF'
-          from pathlib import Path
-
-          manifest_path = Path("android/app/src/main/AndroidManifest.xml")
-          if manifest_path.exists():
-              content = manifest_path.read_text(encoding="utf-8")
-              intent_filter = """        <intent-filter>
-            <action android:name="android.intent.action.VIEW" />
-            <category android:name="android.intent.category.DEFAULT" />
-            <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="brisaplan" />
-          </intent-filter>"""
-              if 'android:scheme="brisaplan"' not in content and "</activity>" in content:
-                  content = content.replace("</activity>", f"{intent_filter}\n      </activity>", 1)
-                  manifest_path.write_text(content, encoding="utf-8")
-          PYEOF
-          if [ -d "android-widget-template/app/src/main" ]; then
-            cp -r android-widget-template/app/src/main/* android/app/src/main/
+          npm install
+          if [ ! -d "android" ]; then
+            npx cap add android
           fi
-          cat << 'EOF' >> android/app/build.gradle
+          npx cap sync android
 
-          configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-              }
-          }
-          EOF
-          cd android && ./gradlew assembleDebug
+      - name: Grant execute permission for gradlew & Build Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-      - name: Rename APK to BrisaPlan.apk
+      - name: Rename APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk BrisaPlan.apk
 
-      - name: Upload APK artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BrisaPlan-APK
           path: BrisaPlan.apk
 
-      - name: Publish BrisaPlan.apk to Release
-        if: github.event_name == 'release'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload "${{ github.event.release.tag.name }}" BrisaPlan.apk --clobber
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v8.0.${{ github.run_number }}
+          name: BrisaPlan v8.0.${{ github.run_number }}
+          files: BrisaPlan.apk
+          make_latest: true
