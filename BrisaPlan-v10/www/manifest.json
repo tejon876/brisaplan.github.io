@@ -1,0 +1,16 @@
+{
+  "name": "BrisaPlan",
+  "short_name": "BrisaPlan",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "description": "Organizador personal minimalista offline-first con agenda base y temporal, tareas, hábitos, correos y widgets.",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23000000'/%3E%3Ccircle cx='256' cy='256' r='140' fill='none' stroke='%2393c5fd' stroke-width='28'/%3E%3Cpath d='M256 176v88l56 36' fill='none' stroke='%23fed7aa' stroke-width='28' stroke-linecap='round'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
