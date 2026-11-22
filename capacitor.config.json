@@ -3,9 +3,6 @@
   "appName": "BrisaPlan",
   "webDir": "www",
   "bundledWebRuntime": false,
-  "server": {
-    "androidScheme": "https"
-  },
   "plugins": {
     "GoogleAuth": {
       "scopes": ["profile", "email"],
