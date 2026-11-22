@@ -6,8 +6,7 @@
   "server": {
     "url": "https://tejon876.github.io/brisaplan.github.io/",
     "androidScheme": "https"
-  }
-},
+  },
   "plugins": {
     "GoogleAuth": {
       "scopes": ["profile", "email"],
