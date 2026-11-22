@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brisaplan-v10-offline';
+const CACHE_NAME = 'brisaplan-v9-offline';
 const ASSETS = [
   './',
   './index.html',

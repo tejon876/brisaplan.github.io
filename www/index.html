@@ -4,54 +4,39 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>BrisaPlan</title>
+  <title>BrisaPlan v9</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="dark-mode">
-  <header class="topbar">
-    <div class="brand-wrap">
-      <div class="brand-orb"></div>
-      <h1 class="brand-title">BrisaPlan</h1>
-      <span class="status-chip" id="syncChip">
-        <span class="status-dot"></span>
-        <span id="syncText">Local</span>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <h1>BrisaPlan</h1>
+      <span class="sync-pill" id="syncPill">
+        <span class="sync-dot"></span>
+        <span id="syncText">Listo</span>
       </span>
     </div>
-    <div class="topbar-actions">
-      <button id="openTutorialBtn" class="btn">Tutorial</button>
-      <button id="themeBtn" class="btn">Claro</button>
-      <button id="accountBtn" class="account-pill">
+    <div class="header-actions">
+      <button id="themeToggle" class="btn">Claro</button>
+      <button id="accountTrigger" class="avatar-btn">
         <span class="avatar-circle" id="userAvatar">G</span>
         <span id="userLabel">Acceder</span>
       </button>
     </div>
   </header>
 
-  <main class="shell">
-    <!-- TARJETA SUPERIOR DE BIENVENIDA NEUTRA -->
-    <div class="hero-banner" id="heroBanner">
-      <div>
-        <div style="font-weight: 700; font-size: 0.98rem;" id="heroGreeting">Organiza tu día con calma</div>
-        <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;" id="heroSub">
-          Todo funciona sin internet y se respalda en tu cuenta cuando te conectas.
-        </div>
-      </div>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button id="openWidgetStudioBtn" class="btn btn-primary">Widgets de inicio</button>
-        <button id="quickPermsBtn" class="btn btn-peach">Permisos</button>
-      </div>
-    </div>
-
-    <!-- 1. AGENDA BASE Y TEMPORAL -->
-    <section id="panel-agenda" class="view-panel active">
+  <main class="container">
+    <!-- 1. AGENDA BASE Y TEMPORAL (100% OFFLINE/ONLINE) -->
+    <section id="view-agenda" class="view-section active">
       <div class="card">
-        <div class="card-head">
+        <div class="card-header">
           <h2 class="card-title">Agenda Semanal y Ajustes Temporales</h2>
-          <span class="tag">Base + Temporal</span>
+          <span class="badge">Offline-First</span>
         </div>
-        <div class="input-row">
-          <input type="text" id="agendaTitle" placeholder="Actividad o bloque (ej. Reunión de proyecto)" />
+        <div class="form-row">
+          <input type="text" id="agendaTitle" placeholder="Clase o actividad (ej. Redes CCNA)" />
           <select id="agendaDay">
             <option value="Lunes">Lunes</option>
             <option value="Martes">Martes</option>
@@ -61,7 +46,7 @@
             <option value="Sábado">Sábado</option>
             <option value="Domingo">Domingo</option>
           </select>
-          <input type="time" id="agendaTime" value="09:00" />
+          <input type="time" id="agendaTime" value="07:00" />
           <select id="agendaType">
             <option value="permanent">Base Permanente</option>
             <option value="override">Temporal (Días)</option>
@@ -70,20 +55,20 @@
           <input type="color" id="agendaColor" value="#93c5fd" />
           <button id="addAgendaBtn" class="btn btn-primary">Guardar</button>
         </div>
-        <div id="agendaList" class="stack-list"></div>
+        <div id="agendaList" class="item-list"></div>
       </div>
     </section>
 
-    <!-- 2. TAREAS PRIORITARIAS CON NOTIFICACIÓN Y POMODORO -->
-    <section id="panel-tasks" class="view-panel">
+    <!-- 2. ENTREGAS, TAREAS CON NOTIFICACIÓN ESCALONADA Y POMODORO -->
+    <section id="view-tasks" class="view-section">
       <div class="card">
-        <div class="card-head">
-          <h2 class="card-title">Tareas Prioritarias y Enfoque</h2>
-          <span class="tag" id="pomoTag">Pomodoro</span>
+        <div class="card-header">
+          <h2 class="card-title">Entregas, Prioridades y Alertas</h2>
+          <span class="badge" id="pomoStatus">Pomodoro</span>
         </div>
-        <div class="pomo-card">
-          <div style="font-size: 0.82rem; color: var(--text-muted);">Temporizador de enfoque</div>
-          <div class="pomo-clock" id="pomoClock">25:00</div>
+        <div class="pomodoro-box">
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">Sesión de enfoque</div>
+          <div class="pomodoro-time" id="pomoDisplay">25:00</div>
           <div style="display: flex; gap: 8px; justify-content: center;">
             <button id="pomoStart" class="btn btn-primary">Iniciar</button>
             <button id="pomoPause" class="btn">Pausar</button>
@@ -91,81 +76,96 @@
           </div>
         </div>
 
-        <div class="input-row">
-          <input type="text" id="taskInput" placeholder="Nueva tarea o entrega..." />
-          <input type="datetime-local" id="taskDue" title="Fecha y hora límite" />
-          <select id="taskPriority">
-            <option value="Alta">Prioridad Alta (24h, 2h y 30m antes)</option>
-            <option value="Media" selected>Prioridad Media (6h y 1h antes)</option>
-            <option value="Baja">Prioridad Baja (2h antes)</option>
+        <div class="form-row">
+          <input type="text" id="taskInput" placeholder="Nueva entrega o tarea..." />
+          <input type="datetime-local" id="taskDue" title="Fecha y hora de vencimiento" />
+          <select id="taskPriority" title="Nivel de alerta">
+            <option value="Alta">Prioridad Alta (avisa 24h, 2h y 30m antes)</option>
+            <option value="Media" selected>Prioridad Media (avisa 6h y 1h antes)</option>
+            <option value="Baja">Prioridad Baja (avisa 2h antes)</option>
           </select>
           <input type="color" id="taskColor" value="#fed7aa" />
-          <button id="addTaskBtn" class="btn btn-primary">Agregar</button>
+          <button id="addTaskBtn" class="btn btn-primary">Programar</button>
         </div>
-        <div id="taskList" class="stack-list"></div>
+        <div id="taskList" class="item-list"></div>
       </div>
     </section>
 
-    <!-- 3. HÁBITOS Y RACHAS -->
-    <section id="panel-habits" class="view-panel">
+    <!-- 3. HÁBITOS Y RACHAS (100% OFFLINE/ONLINE) -->
+    <section id="view-habits" class="view-section">
       <div class="card">
-        <div class="card-head">
+        <div class="card-header">
           <h2 class="card-title">Hábitos y Rachas Diarias</h2>
-          <span class="tag">Constancia</span>
+          <span class="badge">Auto-guardado</span>
         </div>
-        <div class="input-row">
-          <input type="text" id="habitInput" placeholder="Ej. Leer 20 minutos" />
-          <button id="addHabitBtn" class="btn btn-primary">Nuevo Hábito</button>
+        <div class="form-row">
+          <input type="text" id="habitInput" placeholder="Ej. Estudiar japonés 30 min" />
+          <button id="addHabitBtn" class="btn btn-primary">Agregar Hábito</button>
         </div>
-        <div id="habitGrid" class="habit-cards"></div>
+        <div id="habitGrid" class="habit-grid"></div>
       </div>
     </section>
 
-    <!-- 4. BANDEJA DE CORREOS MULTI-CUENTA -->
-    <section id="panel-mail" class="view-panel">
+    <!-- 4. CORREOS MULTI-CUENTA (CON DETECCIÓN OFFLINE) -->
+    <section id="view-mail" class="view-section">
       <div class="card">
-        <div class="card-head">
+        <div class="card-header">
           <h2 class="card-title">Organizador de Correos y Filtro Antispam</h2>
-          <span class="tag" id="mailNetTag">En línea</span>
+          <span class="badge" id="mailNetBadge">En línea</span>
         </div>
-        <div class="offline-alert" id="mailOfflineAlert">
-          Sin conexión a internet: mostrando tus correos guardados en caché local. Se actualizarán automáticamente cuando vuelvas a conectarte.
+        <div class="offline-banner" id="mailOfflineBanner">
+          Sin conexión a internet: mostrando correos guardados en caché local. La sincronización en vivo con cuentas personales e institucionales se reanudará al volver la red.
         </div>
-        <div class="input-row">
-          <input type="email" id="mailAccount" placeholder="Cuenta (ej. nombre@correo.com)" />
+        <div class="form-row">
+          <input type="email" id="mailAccount" placeholder="Cuenta (ej. alumno@uteq.edu.mx)" />
           <input type="text" id="mailSubject" placeholder="Asunto o remitente..." />
           <select id="mailCategory">
             <option value="Importante">Importante</option>
-            <option value="Trabajo / Estudio">Trabajo / Estudio</option>
+            <option value="Universidad">Universidad</option>
             <option value="Spam">Spam / Ruido</option>
           </select>
           <button id="addMailBtn" class="btn btn-primary">Guardar</button>
         </div>
         <div style="margin-bottom: 12px;">
-          <label style="font-size: 0.84rem; color: var(--text-muted); cursor: pointer;">
+          <label style="font-size: 0.84rem; color: var(--text-secondary); cursor: pointer;">
             <input type="checkbox" id="hideSpamCheck" checked /> Ocultar correos marcados como Spam
           </label>
         </div>
-        <div id="mailList" class="stack-list"></div>
+        <div id="mailList" class="item-list"></div>
       </div>
     </section>
 
-    <!-- 5. AJUSTES, DESCARGA APK Y PRIVACIDAD -->
-    <section id="panel-settings" class="view-panel">
+    <!-- 5. PERMISOS, WIDGET DE INICIO, APK Y PRIVACIDAD -->
+    <section id="view-settings" class="view-section">
       <div class="card">
-        <div class="card-head">
-          <h2 class="card-title">Widgets, Notificaciones y Descarga</h2>
-          <span class="tag">BrisaPlan</span>
+        <div class="card-header">
+          <h2 class="card-title">Widget de Pantalla de Inicio (Android)</h2>
+          <span class="badge">Nativo</span>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 12px;">
+          BrisaPlan incluye un widget nativo sincronizado automáticamente con tus tareas y hábitos. Para ponerlo en tu celular:
+        </p>
+        <ol style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6; padding-left: 18px; margin-bottom: 14px;">
+          <li>Mantén presionado un espacio vacío en la pantalla de inicio de tu teléfono.</li>
+          <li>Toca <strong>Widgets</strong> y busca <strong>BrisaPlan Hoy</strong>.</li>
+          <li>Arrástralo a tu pantalla y redimensiónalo a tu gusto.</li>
+        </ol>
+        <button id="forceWidgetSyncBtn" class="btn btn-primary">Actualizar datos del Widget ahora</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Permisos, Notificaciones y Descarga</h2>
+          <span class="badge">v9.0</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-          <button id="openWidgetStudioBtn2" class="btn btn-primary">Elegir Widgets (Vista Flotante)</button>
-          <button id="openPermsBtn2" class="btn">Permisos del Teléfono</button>
+          <button id="openPermsBtn" class="btn btn-primary">Configurar Permisos y Alertas</button>
           <button id="testNotifBtn" class="btn">Probar Notificación (5s)</button>
           <a href="https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk" class="btn" target="_blank" rel="noopener">
-            Descargar App Android (.apk)
+            Descargar BrisaPlan.apk
           </a>
           <a href="https://paypal.me/jmatat8" class="btn" target="_blank" rel="noopener">
-            Apoyar Proyecto (PayPal)
+            Apoyar (PayPal)
           </a>
           <button id="openArcoBtn" class="btn">Privacidad y Derechos ARCO</button>
         </div>
@@ -173,160 +173,89 @@
     </section>
   </main>
 
-  <nav class="bottom-bar">
-    <button class="tab-btn active" data-target="panel-agenda">Agenda</button>
-    <button class="tab-btn" data-target="panel-tasks">Tareas</button>
-    <button class="tab-btn" data-target="panel-habits">Hábitos</button>
-    <button class="tab-btn" data-target="panel-mail">Correos</button>
-    <button class="tab-btn" data-target="panel-settings">Ajustes</button>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-target="view-agenda">Agenda</button>
+    <button class="nav-btn" data-target="view-tasks">Entregas</button>
+    <button class="nav-btn" data-target="view-habits">Hábitos</button>
+    <button class="nav-btn" data-target="view-mail">Correos</button>
+    <button class="nav-btn" data-target="view-settings">Ajustes</button>
   </nav>
 
-  <!-- MODAL FLOTANTE: SELECTOR DE WIDGETS CON VISTA PREVIA Y 1 CLIC -->
-  <div class="backdrop" id="widgetStudioModal">
-    <div class="modal-sheet">
-      <div class="card-head">
-        <h3 class="card-title">Widgets de Pantalla de Inicio</h3>
-        <button id="closeWidgetStudioBtn" class="btn">Cerrar</button>
-      </div>
-      <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5; margin-bottom: 14px;">
-        Selecciona el estilo que prefieras, previsualiza cómo se verá en tu teléfono y fíjalo con un solo toque.
-      </p>
-
-      <!-- VISTA PREVIA FLOTANTE EN VIVO -->
-      <div class="widget-preview-stage">
-        <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em;">
-          Vista previa en pantalla de inicio
-        </div>
-        <div class="widget-mock-card" id="widgetMockPreview">
-          <div id="mockTag" style="font-size: 0.7rem; font-weight: 700; color: #93c5fd;">BRISAPLAN • HOY</div>
-          <div id="mockTitle" style="font-size: 0.96rem; font-weight: 700; color: #f8fafc; margin-top: 4px;">Todo al día • 0 pendientes</div>
-          <div id="mockSub" style="font-size: 0.78rem; color: #94a3b8; margin-top: 3px;">Toca para abrir BrisaPlan</div>
-        </div>
-      </div>
-
-      <!-- SELECTOR DE ESTILOS (ACTIVAR / DESACTIVAR) -->
-      <div class="widget-option-grid">
-        <button type="button" class="widget-opt selected" data-wtype="hoy">
-          <div style="font-weight: 700; font-size: 0.86rem;">1. Resumen Hoy</div>
-          <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">Pendientes y siguiente entrega</div>
-        </button>
-        <button type="button" class="widget-opt" data-wtype="agenda">
-          <div style="font-weight: 700; font-size: 0.86rem;">2. Agenda del Día</div>
-          <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">Próximos bloques horarios</div>
-        </button>
-        <button type="button" class="widget-opt" data-wtype="habits">
-          <div style="font-weight: 700; font-size: 0.86rem;">3. Rachas Activas</div>
-          <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">Contador diario de hábitos</div>
-        </button>
-      </div>
-
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 10px 12px; background: #14141a; border-radius: 14px;">
-        <span style="font-size: 0.84rem;">Sincronizar este widget en segundo plano</span>
-        <input type="checkbox" id="widgetEnabledCheck" checked style="width: 18px; height: 18px;" />
-      </div>
-
-      <button id="pinWidgetOneClickBtn" class="btn btn-primary" style="width: 100%; padding: 12px;">
-        Poner este Widget en mi pantalla (1 clic)
-      </button>
-    </div>
-  </div>
-
-  <!-- MODAL FLOTANTE: TUTORIAL INTERACTIVO PASO A PASO -->
-  <div class="backdrop" id="tutorialModal">
-    <div class="modal-sheet">
-      <div class="card-head">
-        <h3 class="card-title" id="tutStepTitle">Bienvenido a BrisaPlan</h3>
-        <button id="closeTutBtn" class="btn">Cerrar</button>
-      </div>
-      <p id="tutStepBody" style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 18px;">
-        Organiza tu semana con una agenda permanente y ajustes temporales para días especiales sin desordenar tu rutina base.
-      </p>
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span id="tutCounter" style="font-size: 0.78rem; color: #94a3b8;">Paso 1 de 4</span>
-        <div style="display: flex; gap: 8px;">
-          <button id="tutPrevBtn" class="btn">Anterior</button>
-          <button id="tutNextBtn" class="btn btn-primary">Siguiente</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL FLOTANTE: PERMISOS CON 1 CLIC -->
-  <div class="backdrop" id="permsModal">
-    <div class="modal-sheet">
-      <div class="card-head">
-        <h3 class="card-title">Permisos del Teléfono</h3>
-        <button id="closePermsBtn" class="btn">Listo</button>
-      </div>
-      <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5; margin-bottom: 14px;">
-        Activa con un toque los permisos necesarios para recibir alertas antes de tus entregas y fijar widgets en tu inicio:
-      </p>
-      <div class="perm-item">
-        <div>
-          <div style="font-weight: 600; font-size: 0.9rem;">Notificaciones y Recordatorios</div>
-          <div style="font-size: 0.78rem; color: #94a3b8;" id="notifPermStatus">Alertas automáticas según prioridad.</div>
-        </div>
-        <button id="reqNotifPermBtn" class="btn btn-primary">Activar</button>
-      </div>
-      <div class="perm-item">
-        <div>
-          <div style="font-weight: 600; font-size: 0.9rem;">Widgets en Pantalla de Inicio</div>
-          <div style="font-size: 0.78rem; color: #94a3b8;">Permite fijar tarjetas interactivas con 1 clic.</div>
-        </div>
-        <button id="openWidgetFromPermBtn" class="btn btn-peach">Elegir</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL FLOTANTE: CUENTA Y ESTADO DE SESIÓN -->
-  <div class="backdrop" id="accountModal">
-    <div class="modal-sheet">
-      <div class="card-head">
-        <h3 class="card-title">Cuenta y Respaldo en la Nube</h3>
+  <!-- SHEET PROFESIONAL DE CUENTA / CIERRE DE SESIÓN -->
+  <div class="modal-backdrop" id="accountModal">
+    <div class="sheet-card">
+      <div class="card-header">
+        <h3 class="card-title">Cuenta y Sincronización</h3>
         <button id="closeAccountBtn" class="btn">Cerrar</button>
       </div>
       <div id="loggedOutView">
-        <p style="font-size: 0.86rem; color: #94a3b8; line-height: 1.55; margin-bottom: 16px;">
-          Inicia sesión con tu cuenta de Google para sincronizar tu agenda, tareas y hábitos entre tus dispositivos. También puedes usar BrisaPlan sin cuenta y sin internet.
+        <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin-bottom: 16px;">
+          Conecta tu cuenta personal de Google o tu correo institucional (ej. <strong>@uteq.edu.mx</strong>) para respaldar tu agenda, tareas y rachas en la nube sin perder el acceso sin internet.
         </p>
         <button id="googleSignInBtn" class="btn btn-primary" style="width: 100%; padding: 12px;">
-          Continuar con Google
+          Continuar con Google (Nativo)
         </button>
       </div>
       <div id="loggedInView" style="display: none;">
-        <div style="display: flex; align-items: center; gap: 12px; padding: 14px; background: #14141a; border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 16px; margin-bottom: 16px;">
-          <div class="avatar-circle" id="sheetAvatar" style="width: 46px; height: 46px; font-size: 1.1rem;">U</div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #141419; border-radius: 16px; margin-bottom: 16px;">
+          <div class="avatar-circle" id="sheetAvatar" style="width: 44px; height: 44px; font-size: 1.1rem;">U</div>
           <div>
-            <div style="font-size: 0.75rem; color: #34d399; font-weight: 600;">● Sesión activa y sincronizada</div>
-            <div id="sheetUserName" style="font-weight: 700; font-size: 0.96rem; margin-top: 2px;">Usuario</div>
+            <div id="sheetUserName" style="font-weight: 600; font-size: 0.95rem;">Usuario</div>
             <div id="sheetUserEmail" style="font-size: 0.8rem; color: #94a3b8;">correo@ejemplo.com</div>
           </div>
         </div>
         <button id="googleSignOutBtn" class="btn btn-danger" style="width: 100%; padding: 12px;">
-          Cerrar sesión
+          Cerrar sesión de forma segura
         </button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL FLOTANTE: PRIVACIDAD Y DERECHOS ARCO -->
-  <div class="backdrop" id="arcoModal">
-    <div class="modal-sheet">
-      <div class="card-head">
-        <h3 class="card-title">Privacidad y Derechos ARCO</h3>
-        <button id="closeArcoBtn" class="btn">Cerrar</button>
+  <!-- ONBOARDING DE PERMISOS PROFESIONAL -->
+  <div class="modal-backdrop" id="permsModal">
+    <div class="sheet-card">
+      <div class="card-header">
+        <h3 class="card-title">Permisos de BrisaPlan</h3>
+        <button id="closePermsBtn" class="btn">Listo</button>
       </div>
-      <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.55; margin-bottom: 14px;">
-        Tus datos se almacenan primero en tu dispositivo y se respaldan en tu cuenta privada solo si decides iniciar sesión. Puedes descargar o eliminar toda tu información en cualquier momento.
+      <p style="font-size: 0.86rem; color: #94a3b8; line-height: 1.5; margin-bottom: 14px;">
+        Para avisarte a tiempo antes de tus entregas y mantener tus widgets al día, activa los permisos del sistema:
       </p>
-      <div style="display: flex; gap: 10px;">
-        <button id="exportDataBtn" class="btn btn-primary">Exportar JSON</button>
-        <button id="wipeDataBtn" class="btn btn-danger">Eliminar mis datos</button>
+      <div class="perm-row">
+        <div>
+          <div style="font-weight: 600; font-size: 0.9rem;">Notificaciones y Recordatorios</div>
+          <div style="font-size: 0.78rem; color: #94a3b8;">Alertas escalonadas según prioridad (Alta, Media, Baja).</div>
+        </div>
+        <button id="reqNotifPermBtn" class="btn btn-primary">Activar</button>
+      </div>
+      <div class="perm-row">
+        <div>
+          <div style="font-weight: 600; font-size: 0.9rem;">Almacenamiento Offline y Widget</div>
+          <div style="font-size: 0.78rem; color: #94a3b8;">Guarda cambios sin internet y actualiza el widget de inicio.</div>
+        </div>
+        <span class="badge">Activo</span>
       </div>
     </div>
   </div>
 
-  <div class="toast" id="toast">Listo</div>
+  <!-- MODAL DERECHOS ARCO -->
+  <div class="modal-backdrop" id="arcoModal">
+    <div class="sheet-card">
+      <div class="card-header">
+        <h3 class="card-title">Privacidad y Derechos ARCO</h3>
+        <button id="closeArcoBtn" class="btn">Cerrar</button>
+      </div>
+      <p style="font-size: 0.86rem; color: #94a3b8; line-height: 1.55; margin-bottom: 14px;">
+        Tus datos se guardan localmente primero y se sincronizan de forma privada con Firebase Firestore solo si inicias sesión. Puedes exportar o borrar toda tu información cuando quieras.
+      </p>
+      <div style="display: flex; gap: 10px;">
+        <button id="exportDataBtn" class="btn btn-primary">Exportar JSON</button>
+        <button id="wipeDataBtn" class="btn btn-danger">Borrar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Guardado</div>
 
   <script type="module" src="app.js"></script>
 </body>

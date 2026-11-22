@@ -1,9 +1,11 @@
-# BrisaPlan v10 (Estética Original + Widgets Flotantes con 1 Clic + Firma Fija)
+# BrisaPlan v9 (Nativo Android + PWA Offline-First)
 
-## Huella SHA-1 Fija (Registrar en Firebase Console > `com.brisaplan.app`)
-`SHA1: 66:59:03:B8:0F:FD:6E:8F:03:F5:29:74:14:F5:5F:1B:AF:48:55:E2`
+## Huella Digital SHA-1 Fija (Registrar en Firebase)
+Si regeneras el paquete, verifica que esta huella coincida en Firebase Console > Configuración del proyecto > Tus apps > `com.brisaplan.app`:
 
-## Mejoras de la v10
-1. **Estética unificada Web y Android:** Paleta durazno-marfil y azul pastel con modo oscuro puro (`#000000`), tutorial interactivo paso a paso y textos 100% neutros para cualquier usuario.
-2. **Estudio flotante de Widgets con 1 clic:** Permite previsualizar en vivo 3 estilos (**Resumen Hoy**, **Agenda del Día** y **Rachas Activas**), activarlos/desactivarlos y fijarlos directamente en la pantalla de inicio con `AppWidgetManager.requestPinAppWidget()`.
-3. **Firma SHA-1 y Manifest garantizados:** `inject_native.py` se ejecuta después de `npx cap sync android` y configura `signingConfigs.debug` en `build.gradle` para eliminar el error `Something went wrong` en Google Sign-In.
+`SHA1: F4:DD:E2:45:96:7C:7B:E4:53:D1:42:90:58:65:23:EC:CA:8D:07:54`
+
+## Contenido del ZIP
+1. `www/`: Aplicación web y PWA offline-first (`index.html`, `styles.css`, `app.js`, `manifest.json`, `sw.js`).
+2. `native-android/`: Proveedor nativo en Kotlin (`BrisaPlanWidgetProvider.kt`), layouts XML para el widget de pantalla de inicio (`BrisaPlan Hoy`), script de inyección de permisos (`inject_native.py`) y `brisaplan-debug.keystore`.
+3. `.github/workflows/build-apk.yml`: Flujo automático para compilar `BrisaPlan.apk` y publicarlo en Releases.
