@@ -686,8 +686,10 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
-  padding: 14px 16px;
+  overflow: hidden;
+  padding: 13px 14px;
   border-radius: var(--radius-md);
   background: var(--bg-page);
   border: 1px solid var(--border-subtle);
@@ -721,18 +723,20 @@
 .mail-account-badge {
   background: var(--peach-soft);
   color: var(--text-main);
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  max-width: 72%;
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 68%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .mail-date {
-  font-size: 0.75rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
@@ -740,64 +744,112 @@
 
 .mail-subject {
   font-weight: 700;
-  font-size: 0.96rem;
-  line-height: 1.38;
+  font-size: 0.93rem;
+  line-height: 1.35;
   color: var(--text-main);
-  word-break: normal;
-  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mail-card.expanded .mail-subject {
+  -webkit-line-clamp: unset;
 }
 
 .mail-spam-tag {
   display: inline-block;
   background: rgba(244, 63, 94, 0.16);
   color: #FB7185;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: 6px;
   margin-right: 4px;
 }
 
 .mail-sender {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--sky-primary);
-  overflow-wrap: break-word;
-  word-break: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .mail-snippet {
-  font-size: 0.83rem;
-  line-height: 1.45;
+  font-size: 0.81rem;
+  line-height: 1.42;
   color: var(--text-muted);
   margin: 0;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  overflow-wrap: break-word;
-  word-break: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mail-card.expanded .mail-snippet {
+  -webkit-line-clamp: unset;
+}
+
+.mail-expand-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--sky-primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 0;
 }
 
 .mail-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 10px;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
   flex-wrap: wrap;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
+  .mail-card {
+    padding: 11px 12px;
+    gap: 6px;
+  }
+  .mail-account-badge {
+    max-width: 62%;
+    font-size: 0.69rem;
+  }
+  .mail-subject {
+    font-size: 0.88rem;
+  }
+  .mail-snippet {
+    -webkit-line-clamp: 2;
+    font-size: 0.78rem;
+  }
   .mail-actions {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 6px;
+    width: 100%;
   }
   .mail-actions .btn {
-    flex: 1;
-    min-height: 36px;
-    padding: 6px 10px;
-    font-size: 0.8rem;
+    width: 100%;
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+  .mail-actions .btn-icon-del {
+    min-width: 34px;
+    min-height: 34px;
   }
 }

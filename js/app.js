@@ -2,6 +2,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import {
   getAuth,
   GoogleAuthProvider,
+  EmailAuthProvider,
+  linkWithCredential,
+  signInWithCredential,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -71,6 +74,7 @@ let tutorialIndex = 0;
 let mailTabFilter = 'all';
 let activeMailSession = 'all';
 let mailSearchQuery = '';
+const expandedMailIds = new Set();
 
 let deferredInstallPrompt = null;
 let isUnlocking = false;
@@ -83,7 +87,7 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(window.__brisaToastTimer);
-  window.__brisaToastTimer = setTimeout(() => el.classList.remove('show'), 3800);
+  window.__brisaToastTimer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
 function esc(str) {
@@ -102,24 +106,84 @@ function isCapacitorNativeApp() {
   );
 }
 
+function isAndroidDevice() {
+  return /Android/i.test(navigator.userAgent || '');
+}
+
 function clearAuthErrorFromUrl() {
   try {
     const url = new URL(window.location.href);
     if (url.searchParams.has('apiKey') || url.hash.includes('error') || url.search.includes('error')) {
-      window.history.replaceState({}, document.title, url.pathname + url.search);
+      window.history.replaceState({}, document.title, url.pathname);
     }
   } catch {}
+}
+
+function getOAuthRedirectUri() {
+  try {
+    const origin = window.location.origin || '';
+    const path = window.location.pathname || '/';
+    if (origin.startsWith('http')) {
+      // Asegura URL limpia de GitHub Pages autorizada en Google Cloud Console
+      const cleanPath = path.endsWith('index.html') ? path.slice(0, -'index.html'.length) : path;
+      return `${origin}${cleanPath.endsWith('/') ? cleanPath : cleanPath + '/'}`;
+    }
+  } catch {}
+  return "https://tejon876.github.io/brisaplan.github.io/";
 }
 
 function openExternalAuthFlow(url) {
   try {
     const capBrowser = window.Capacitor?.Plugins?.Browser;
     if (capBrowser && typeof capBrowser.open === "function") {
-      return capBrowser.open({ url });
+      return capBrowser.open({ url, presentationStyle: 'popover' });
     }
   } catch {}
   window.open(url, "_blank", "noopener,noreferrer");
   return Promise.resolve();
+}
+
+async function closeExternalAuthBrowser() {
+  try {
+    const capBrowser = window.Capacitor?.Plugins?.Browser;
+    if (capBrowser && typeof capBrowser.close === "function") {
+      await capBrowser.close();
+    }
+  } catch {}
+}
+
+async function processOAuthReturnUrl(rawUrl) {
+  if (!rawUrl || !rawUrl.startsWith("brisaplan://")) return false;
+  clearAuthErrorFromUrl();
+  await closeExternalAuthBrowser();
+  try {
+    const normalized = rawUrl.replace("brisaplan://auth", "https://auth.local/").replace("brisaplan://", "https://auth.local/");
+    const parsed = new URL(normalized);
+    const hashParams = new URLSearchParams((parsed.hash || '').replace(/^#/, ''));
+    const idToken = parsed.searchParams.get("id_token") || hashParams.get("id_token");
+    const accessToken = parsed.searchParams.get("access_token") || hashParams.get("access_token");
+    const errParam = parsed.searchParams.get("error") || hashParams.get("error");
+
+    if (errParam) {
+      toast(`Google canceló o bloqueó el acceso (${errParam}).`);
+      return true;
+    }
+
+    if (idToken || accessToken) {
+      toast("Conectando tu cuenta de Google...");
+      await setPersistence(auth, browserLocalPersistence);
+      const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
+      const res = await signInWithCredential(auth, credential);
+      if (res?.user) {
+        await handleUserAuthenticated(res.user);
+      }
+      return true;
+    }
+  } catch (e) {
+    console.error(e);
+    toast("No se pudo completar el retorno desde Google. Entra con correo y contraseña.");
+  }
+  return false;
 }
 
 function setupCapacitorAppUrlListener() {
@@ -127,27 +191,13 @@ function setupCapacitorAppUrlListener() {
     const capApp = window.Capacitor?.Plugins?.App;
     if (capApp && typeof capApp.addListener === "function") {
       capApp.addListener("appUrlOpen", async ({ url }) => {
-        if (!url || !url.startsWith("brisaplan://")) return;
-        clearAuthErrorFromUrl();
-        try {
-          const parsed = new URL(url.replace("brisaplan://", "https://auth.local/"));
-          const idToken = parsed.searchParams.get("id_token") || parsed.hash.match(/id_token=([^&]+)/)?.[1];
-          const accessToken = parsed.searchParams.get("access_token") || parsed.hash.match(/access_token=([^&]+)/)?.[1];
-          if (idToken || accessToken) {
-            const { GoogleAuthProvider, signInWithCredential } = await import(
-              "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"
-            );
-            const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
-            const res = await signInWithCredential(auth, credential);
-            if (res?.user) {
-              await handleUserAuthenticated(res.user);
-            }
-          }
-        } catch (e) {
-          console.error(e);
-          toast("No se pudo completar el retorno desde Google. Usa correo y contraseña.");
-        }
+        await processOAuthReturnUrl(url);
       });
+      if (typeof capApp.getLaunchUrl === "function") {
+        capApp.getLaunchUrl().then(async (launch) => {
+          if (launch?.url) await processOAuthReturnUrl(launch.url);
+        }).catch(() => {});
+      }
     }
   } catch {}
 }
@@ -175,14 +225,48 @@ function clearLocalVaultSession(uid) {
 
 let swReg = null;
 async function initServiceWorker() {
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && !isCapacitorNativeApp()) {
     try {
       swReg = await navigator.serviceWorker.register('./sw.js');
     } catch {}
   }
 }
 
+async function requestNativeNotificationPermission() {
+  if (isCapacitorNativeApp()) {
+    try {
+      const localNotifs = window.Capacitor?.Plugins?.LocalNotifications;
+      if (localNotifs && typeof localNotifs.requestPermissions === 'function') {
+        const res = await localNotifs.requestPermissions();
+        return res?.display === 'granted';
+      }
+    } catch {}
+  }
+  if (!('Notification' in window)) return false;
+  const perm = await Notification.requestPermission();
+  return perm === 'granted';
+}
+
 async function showSafeNotification(title, body) {
+  if (isCapacitorNativeApp()) {
+    try {
+      const localNotifs = window.Capacitor?.Plugins?.LocalNotifications;
+      if (localNotifs && typeof localNotifs.schedule === 'function') {
+        await localNotifs.schedule({
+          notifications: [
+            {
+              id: Math.floor(Date.now() % 2147483000),
+              title,
+              body,
+              schedule: { at: new Date(Date.now() + 800) }
+            }
+          ]
+        });
+        return;
+      }
+    } catch {}
+  }
+
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     if (swReg && swReg.showNotification) {
@@ -191,6 +275,82 @@ async function showSafeNotification(title, body) {
       new Notification(title, { body });
     }
   } catch {}
+}
+
+async function scheduleAndroidNativeReminders() {
+  if (!isCapacitorNativeApp() || !state?.notificationsEnabled) return;
+  try {
+    const localNotifs = window.Capacitor?.Plugins?.LocalNotifications;
+    if (!localNotifs || typeof localNotifs.schedule !== 'function') return;
+
+    const pending = await localNotifs.getPending().catch(() => ({ notifications: [] }));
+    if (pending?.notifications?.length) {
+      await localNotifs.cancel({ notifications: pending.notifications }).catch(() => {});
+    }
+
+    const now = new Date();
+    const today = todayISO();
+    const notifications = [];
+    let nextId = 1001;
+
+    const todayBlocks = (state.agenda || []).filter((a) => isAgendaItemActiveOnDate(a, today));
+    for (const b of todayBlocks) {
+      if (!b.time || !b.time.includes(':')) continue;
+      const [hh, mm] = b.time.split(':').map(Number);
+      const startAt = new Date();
+      startAt.setHours(hh, mm, 0, 0);
+
+      const preAt = new Date(startAt.getTime() - 10 * 60000);
+      if (preAt > now) {
+        notifications.push({
+          id: nextId++,
+          title: 'Próximo bloque en 10 min',
+          body: `${b.title} comienza a las ${b.time}`,
+          schedule: { at: preAt, allowWhileIdle: true }
+        });
+      }
+      if (startAt > now) {
+        notifications.push({
+          id: nextId++,
+          title: '¡Es hora de tu bloque!',
+          body: `${b.title} (${b.time}${b.endTime ? ' - ' + b.endTime : ''})`,
+          schedule: { at: startAt, allowWhileIdle: true }
+        });
+      }
+    }
+
+    const pendingTasks = (state.tasks || []).filter((t) => !t.done && t.dueDate === today && t.dueTime);
+    for (const t of pendingTasks) {
+      if (!t.dueTime.includes(':')) continue;
+      const [hh, mm] = t.dueTime.split(':').map(Number);
+      const dueAt = new Date();
+      dueAt.setHours(hh, mm, 0, 0);
+
+      const preAt = new Date(dueAt.getTime() - 30 * 60000);
+      if (preAt > now) {
+        notifications.push({
+          id: nextId++,
+          title: 'Entrega en 30 minutos',
+          body: `${t.title} vence a las ${t.dueTime}`,
+          schedule: { at: preAt, allowWhileIdle: true }
+        });
+      }
+      if (dueAt > now) {
+        notifications.push({
+          id: nextId++,
+          title: '¡Hora límite de entrega!',
+          body: `${t.title} (${t.dueTime})`,
+          schedule: { at: dueAt, allowWhileIdle: true }
+        });
+      }
+    }
+
+    if (notifications.length) {
+      await localNotifs.schedule({ notifications });
+    }
+  } catch (e) {
+    console.error('Error programando notificaciones nativas:', e);
+  }
 }
 
 function applyTheme(dark) {
@@ -217,10 +377,9 @@ async function saveUserVaultMeta(uid, salt) {
   await setDoc(metaRef, { salt, hasMaster: true, updatedAt: new Date().toISOString() });
 }
 
-
 /* ==================== MODO OFFLINE LOCAL-FIRST Y SINCRONIZACIÓN ==================== */
-const OFFLINE_USER_KEY = 'brisaplan_offline_user_v73';
-const NOTIFIED_LOG_KEY = 'brisaplan_notified_events_v73';
+const OFFLINE_USER_KEY = 'brisaplan_offline_user_v74';
+const NOTIFIED_LOG_KEY = 'brisaplan_notified_events_v74';
 
 function saveOfflineUserProfile(user) {
   if (!user) return;
@@ -310,7 +469,6 @@ function markEventNotified(key) {
   try {
     const map = getNotifiedMap();
     map[key] = Date.now();
-    // Limpiar registros viejos (> 3 días)
     const cutoff = Date.now() - 3 * 86400000;
     for (const k of Object.keys(map)) {
       if (map[k] < cutoff) delete map[k];
@@ -328,14 +486,13 @@ function timeToMinutes(hhmm) {
 
 async function checkScheduledNotifications() {
   if (!state || !state.notificationsEnabled) return;
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!isCapacitorNativeApp() && (!('Notification' in window) || Notification.permission !== 'granted')) return;
 
   const now = new Date();
   const today = todayISO();
   const nowMins = now.getHours() * 60 + now.getMinutes();
   const notified = getNotifiedMap();
 
-  // 1. Revisar bloques de agenda de hoy (aviso 10 min antes y a la hora exacta)
   const todayBlocks = (state.agenda || []).filter((a) => isAgendaItemActiveOnDate(a, today));
   for (const b of todayBlocks) {
     const startMins = timeToMinutes(b.time);
@@ -357,7 +514,6 @@ async function checkScheduledNotifications() {
     }
   }
 
-  // 2. Revisar tareas/entregas de hoy con hora límite (aviso 30 min antes y a la hora exacta)
   const pendingTasks = (state.tasks || []).filter((t) => !t.done && t.dueDate === today && t.dueTime);
   for (const t of pendingTasks) {
     const dueMins = timeToMinutes(t.dueTime);
@@ -383,7 +539,6 @@ async function checkScheduledNotifications() {
 async function loadCloudVault(uid, secret, salt) {
   const localCache = getLocalEncryptedVault(uid);
 
-  // Si no hay internet o hay cambios locales pendientes de subir, priorizar bóveda local cifrada
   if ((!navigator.onLine || (localCache && localCache.pendingSync)) && localCache && localCache.payload) {
     const decryptedLocal = await decryptVaultData(localCache.payload, secret, salt);
     if (navigator.onLine && localCache.pendingSync) {
@@ -419,8 +574,8 @@ async function saveCloudVault() {
   if (!currentUser || !vaultSecret || !vaultSalt) return;
   const encrypted = await encryptVaultData(state, vaultSecret, vaultSalt);
 
-  // Siempre guardar primero en local cifrado para funcionamiento 100% sin internet
   saveLocalEncryptedVault(currentUser.uid, encrypted, true);
+  scheduleAndroidNativeReminders();
 
   if (!navigator.onLine) {
     updateSyncBadgeUI('offline-pending');
@@ -434,6 +589,21 @@ async function saveCloudVault() {
     updateSyncBadgeUI('synced');
   } catch {
     updateSyncBadgeUI('offline-pending');
+  }
+}
+
+async function tryLinkEmailPasswordToCurrentUser(rawPassword) {
+  try {
+    const user = auth.currentUser;
+    if (!user || !user.email || !rawPassword || rawPassword.length < 6) return;
+    const hasPasswordProvider = (user.providerData || []).some((p) => p.providerId === 'password');
+    if (hasPasswordProvider) return;
+    const cred = EmailAuthProvider.credential(user.email, rawPassword);
+    await linkWithCredential(user, cred);
+    toast('Tu contraseña también quedó vinculada para iniciar sesión directa con correo.');
+  } catch (err) {
+    // Si ya estaba vinculada o requiere reautenticación reciente, ignorar silenciosamente
+    console.warn('Vinculación correo/contraseña omitida:', err?.code || err);
   }
 }
 
@@ -455,12 +625,15 @@ async function enterMainApp({ showWelcome = false } = {}) {
 
   saveOfflineUserProfile(currentUser);
   updateSyncBadgeUI(navigator.onLine ? 'synced' : 'offline-pending');
+  configureTopInstallButton();
   await renderAll(false);
   checkScheduledNotifications();
+  scheduleAndroidNativeReminders();
+
   if (!state.tutorialSeen) {
     setTimeout(() => openTutorial(), 450);
   }
-  if (showWelcome) toast('Sesión iniciada y guardada para uso sin internet');
+  if (showWelcome) toast('Sesión iniciada y guardada en este dispositivo');
 }
 
 async function deriveAndEnterWithPassword(user, rawPassword, isNewAccount = false) {
@@ -477,6 +650,7 @@ async function deriveAndEnterWithPassword(user, rawPassword, isNewAccount = fals
     vaultSecret = await hashPasswordPBKDF2(rawPassword, vaultSalt);
     state = await loadCloudVault(user.uid, vaultSecret, vaultSalt);
   }
+  await tryLinkEmailPasswordToCurrentUser(rawPassword);
   saveLocalVaultSession(user.uid, vaultSecret, vaultSalt);
   await enterMainApp({ showWelcome: true });
 }
@@ -487,7 +661,6 @@ async function handleUserAuthenticated(user) {
   currentUser = user;
 
   try {
-    // 1. Verificar sesión persistente en este dispositivo (no vuelve a pedir contraseña al recargar)
     const saved = getLocalVaultSession(currentUser.uid);
     if (saved && saved.secret && saved.salt) {
       vaultSecret = saved.secret;
@@ -503,18 +676,17 @@ async function handleUserAuthenticated(user) {
       }
     }
 
-    // 2. Si inició sesión con Google y aún no tiene llave guardada localmente
     const meta = await checkUserVaultMeta(currentUser.uid);
     if (!meta) {
       $('#vault-title-text').textContent = 'Protege tu Bóveda Cifrada';
-      $('#vault-subtitle-text').textContent = `Cuenta conectada: ${currentUser.email}. Crea una contraseña de seguridad (se recordará en este dispositivo).`;
+      $('#vault-subtitle-text').textContent = `Cuenta conectada: ${currentUser.email}. Crea una contraseña (también te servirá para entrar con correo y contraseña).`;
       $('#vault-confirm-wrap').style.display = 'flex';
       $('#vault-confirm-input').required = true;
       $('#btn-vault-action').textContent = 'Guardar y entrar';
       $('#vault-mode').value = 'create';
     } else {
       $('#vault-title-text').textContent = 'Desbloquear Bóveda';
-      $('#vault-subtitle-text').textContent = `Hola ${currentUser.displayName || currentUser.email}, confirma tu contraseña de bóveda una sola vez en este equipo.`;
+      $('#vault-subtitle-text').textContent = `Hola ${currentUser.displayName || currentUser.email}, confirma tu contraseña una sola vez en este dispositivo.`;
       $('#vault-confirm-wrap').style.display = 'none';
       $('#vault-confirm-input').required = false;
       $('#btn-vault-action').textContent = 'Entrar a BrisaPlan';
@@ -587,14 +759,13 @@ function renderStats() {
 function renderHoy() {
   const today = todayISO();
 
-  // 1. Bloques de hoy
   const todayBlocks = state.agenda.filter((a) => isAgendaItemActiveOnDate(a, today));
   $('#hoy-agenda-list').innerHTML = todayBlocks.length
     ? todayBlocks
         .map(
           (a) => `
           <div class="item-row task-color-bar" style="border-left-color:${esc(a.color || '#4A93C6')};cursor:pointer;" data-act="open-edit-block" data-id="${a.id}">
-            <div>
+            <div style="min-width:0;flex:1;">
               <div class="item-title">${esc(a.time)}${a.endTime ? ` – ${esc(a.endTime)}` : ''} · ${esc(a.title)}</div>
               <div class="item-sub">${a.recurrence === 'permanent' ? 'Bloque semanal fijo' : 'Bloque de hoy'}</div>
             </div>
@@ -604,7 +775,6 @@ function renderHoy() {
         .join('')
     : '<div class="empty-state">No tienes bloques programados para hoy.</div>';
 
-  // 2. Entregas y pendientes clave (prioriza vencidas o de hoy)
   const pending = state.tasks.filter((t) => !t.done);
   $('#hoy-tasks-list').innerHTML = pending.length
     ? pending
@@ -625,16 +795,15 @@ function renderHoy() {
         .join('')
     : '<div class="empty-state">Sin entregas pendientes. Pulsa "+ Entrega" arriba para agregar una.</div>';
 
-  // 3. Hábitos del día
   $('#hoy-habits-list').innerHTML = state.habits.length
     ? state.habits
         .map((h) => {
           const done = isHabitDoneToday(h);
           return `
             <div class="item-row ${done ? 'item-done' : ''}">
-              <div style="display:flex;align-items:center;gap:12px;">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0;">
                 <button class="check-circle ${done ? 'checked' : ''}" data-act="toggle-habit" data-id="${h.id}">✓</button>
-                <div>
+                <div style="min-width:0;">
                   <div class="item-title">${esc(h.name)}</div>
                   <div class="item-sub">${esc(h.category)}</div>
                 </div>
@@ -645,16 +814,15 @@ function renderHoy() {
         .join('')
     : '<div class="empty-state">Aún no has creado hábitos diarios.</div>';
 
-  // 4. Correos importantes
   const impMails = state.messages.filter((m) => !m.isSpam && m.important).slice(0, 4);
   $('#hoy-important-mails-list').innerHTML = impMails.length
     ? impMails
         .map(
           (m) => `
           <div class="item-row">
-            <div style="min-width:0;flex:1;">
-              <div class="item-title">★ ${esc(m.subject)}</div>
-              <div class="item-sub">${esc(m.sender)} · ${esc(m.account)}</div>
+            <div style="min-width:0;flex:1;overflow:hidden;">
+              <div class="item-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">★ ${esc(m.subject)}</div>
+              <div class="item-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.sender)} · ${esc(m.account)}</div>
             </div>
             <button type="button" class="btn btn-soft btn-sm" data-act="jump-mail-account" data-email="${esc(m.account)}">Ver</button>
           </div>`
@@ -682,7 +850,6 @@ function renderWeeklyAgenda() {
     subEl.textContent = `Semana del ${first.dayNum} ${first.monthShort} al ${last.dayNum} ${last.monthShort}`;
   }
 
-  // Selector táctil para móvil
   const pillsEl = $('#mobile-week-pills');
   if (pillsEl) {
     pillsEl.innerHTML = weekDays
@@ -695,7 +862,6 @@ function renderWeeklyAgenda() {
       .join('');
   }
 
-  // Tablero de 7 columnas Lunes a Domingo
   const boardEl = $('#week-grid-board');
   if (!boardEl) return;
 
@@ -804,9 +970,9 @@ function renderTasksAndHabits() {
           const done = isHabitDoneToday(h);
           return `
             <div class="item-row ${done ? 'item-done' : ''}">
-              <div style="display:flex;align-items:center;gap:12px;">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0;">
                 <button class="check-circle ${done ? 'checked' : ''}" data-act="toggle-habit" data-id="${h.id}">✓</button>
-                <div>
+                <div style="min-width:0;">
                   <div class="item-title">${esc(h.name)}</div>
                   <div class="item-sub">${esc(h.category)} · ${h.history?.length || 0} días</div>
                 </div>
@@ -831,7 +997,7 @@ function renderMail() {
     const allChip = `
       <button type="button" class="mail-session-chip ${activeMailSession === 'all' ? 'active' : ''}" data-select-mail-session="all">
         <span class="session-avatar">★</span>
-        <span>Todas las cuentas (${state.mailAccounts.length})</span>
+        <span>Todas (${state.mailAccounts.length})</span>
       </button>`;
 
     const accountChips = state.mailAccounts
@@ -841,11 +1007,11 @@ function renderMail() {
         return `
           <div class="mail-session-chip ${isActive ? 'active' : ''}" data-select-mail-session="${esc(acc.email)}">
             <span class="session-avatar">${esc(initial)}</span>
-            <div>
-              <div>${esc(acc.label || acc.email.split('@')[0])}</div>
-              <div style="font-size:0.7rem;opacity:0.82;">${esc(acc.email)}</div>
+            <div style="min-width:0;max-width:165px;overflow:hidden;text-overflow:ellipsis;">
+              <div style="overflow:hidden;text-overflow:ellipsis;">${esc(acc.label || acc.email.split('@')[0])}</div>
+              <div style="font-size:0.68rem;opacity:0.82;overflow:hidden;text-overflow:ellipsis;">${esc(acc.email)}</div>
             </div>
-            <button type="button" class="btn-icon-del" style="min-width:24px;min-height:24px;padding:0;color:inherit;" data-act="unlink-mail-acc" data-email="${esc(acc.email)}" title="Desvincular cuenta">✕</button>
+            <button type="button" class="btn-icon-del" style="min-width:22px;min-height:22px;padding:0;color:inherit;" data-act="unlink-mail-acc" data-email="${esc(acc.email)}" title="Desvincular cuenta">✕</button>
           </div>`;
       })
       .join('');
@@ -853,7 +1019,6 @@ function renderMail() {
     sessionsBar.innerHTML = allChip + accountChips;
   }
 
-  // Filtrado por sesión de cuenta + carpeta (Bandeja / Importantes / Spam) + búsqueda rápida
   const scopedByAccount = state.messages.filter((m) =>
     activeMailSession === 'all' ? true : m.account === activeMailSession
   );
@@ -887,23 +1052,27 @@ function renderMail() {
   const list = $('#mail-messages-list');
   list.innerHTML = filtered.length
     ? filtered
-        .map(
-          (m) => `
-          <article class="mail-card ${m.isSpam ? 'is-spam' : m.important ? 'is-important' : ''} ${m.read ? 'is-read' : ''}">
+        .map((m) => {
+          const isExpanded = expandedMailIds.has(m.id);
+          const snippetText = (m.snippet || '').trim();
+          const canExpand = snippetText.length > 90 || (m.subject || '').length > 65;
+          return `
+          <article class="mail-card ${isExpanded ? 'expanded' : ''} ${m.isSpam ? 'is-spam' : m.important ? 'is-important' : ''} ${m.read ? 'is-read' : ''}">
             <div class="mail-card-header">
               <span class="mail-account-badge" title="${esc(m.account)}">${esc(m.account)}</span>
               <span class="mail-date">${esc(m.dateLabel || '')}</span>
             </div>
-            <div class="mail-subject">${m.important && !m.isSpam ? '★ ' : ''}${m.isSpam ? '<span class="mail-spam-tag">Spam</span> ' : ''}${esc(m.subject)}</div>
-            <div class="mail-sender">${esc(m.sender)}</div>
-            ${m.snippet ? `<p class="mail-snippet">${esc(m.snippet)}</p>` : ''}
+            <div class="mail-subject">${m.important && !m.isSpam ? '★ ' : ''}${m.isSpam ? '<span class="mail-spam-tag">Spam</span>' : ''}${esc(m.subject)}</div>
+            <div class="mail-sender" title="${esc(m.sender)}">${esc(m.sender)}</div>
+            ${snippetText ? `<p class="mail-snippet">${esc(snippetText)}</p>` : ''}
+            ${canExpand ? `<button type="button" class="mail-expand-btn" data-act="toggle-expand-mail" data-id="${m.id}">${isExpanded ? 'Ver menos ▲' : 'Ver resumen completo ▼'}</button>` : ''}
             <div class="mail-actions">
               <button type="button" class="btn btn-soft btn-sm" data-act="star-mail" data-id="${m.id}">${m.important ? '★ Importante' : '☆ Importante'}</button>
               <button type="button" class="btn btn-outline btn-sm" data-act="read-mail" data-id="${m.id}">${m.read ? 'Leído' : 'No leído'}</button>
               <button type="button" class="btn-icon-del" data-act="del-mail" data-id="${m.id}" title="Eliminar">✕</button>
             </div>
-          </article>`
-        )
+          </article>`;
+        })
         .join('')
     : '<div class="empty-state">No se encontraron correos en esta sesión o filtro. Agrega una cuenta o ajusta el rango de meses.</div>';
 }
@@ -916,7 +1085,6 @@ function renderMiEspacio() {
     apkLink.href = BRISAPLAN_APK_RELEASE.downloadUrl;
   }
 }
-
 
 function syncNativeWidgetSummary() {
   try {
@@ -1006,7 +1174,39 @@ function switchTab(tabName) {
   });
 }
 
+function configureTopInstallButton() {
+  const topBtn = $('#btn-install-mobile-app');
+  if (!topBtn) return;
+  if (isCapacitorNativeApp()) {
+    topBtn.style.display = 'none';
+    return;
+  }
+  if (isAndroidDevice()) {
+    topBtn.textContent = 'Descargar APK';
+  } else {
+    topBtn.textContent = 'Descargar App';
+  }
+}
+
 async function triggerSmartInstall() {
+  if (isCapacitorNativeApp()) {
+    toast('Ya estás usando la app nativa de BrisaPlan en Android.');
+    return;
+  }
+
+  // En Android web: descarga directa del APK nativo (con widgets y notificaciones reales)
+  if (isAndroidDevice()) {
+    toast('Descargando BrisaPlan.apk (con widgets y notificaciones)...');
+    const a = document.createElement('a');
+    a.href = BRISAPLAN_APK_RELEASE.downloadUrl;
+    a.setAttribute('download', BRISAPLAN_APK_RELEASE.fileName);
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+
   if (deferredInstallPrompt) {
     deferredInstallPrompt.prompt();
     const choice = await deferredInstallPrompt.userChoice;
@@ -1030,7 +1230,6 @@ function setupEvents() {
     });
   });
 
-  // Tabs de Login / Registro
   document.querySelectorAll('[data-auth-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const mode = btn.dataset.authMode;
@@ -1058,7 +1257,7 @@ function setupEvents() {
     }
     try {
       await sendPasswordResetEmail(auth, email);
-      toast(`Correo de recuperación enviado a ${email}`);
+      toast(`Correo de recuperación enviado a ${email}. Revisa tu bandeja o spam.`);
     } catch (err) {
       toast('No se pudo enviar el correo. Verifica que la dirección esté registrada.');
     }
@@ -1090,9 +1289,13 @@ function setupEvents() {
       $('#auth-password-input').value = '';
     } catch (err) {
       const code = err.code || '';
-      if (code === 'auth/email-already-in-use') toast('Ese correo ya tiene cuenta. Usa "Iniciar sesión".');
-      else if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') toast('Correo o contraseña incorrectos.');
-      else toast(`Error de acceso (${code || 'verifica tus datos'})`);
+      if (code === 'auth/email-already-in-use') {
+        toast('Ese correo ya tiene cuenta. Usa "Iniciar sesión" o "Continuar con Google".');
+      } else if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        toast('Si creaste esta cuenta con Google, entra con Google o pulsa "¿Olvidaste tu contraseña?" para activar acceso por clave.');
+      } else {
+        toast(`Error de acceso (${code || 'verifica tus datos'})`);
+      }
     } finally {
       btn.disabled = false;
       btn.textContent = mode === 'register' ? 'Crear cuenta y entrar' : 'Entrar a mi cuenta';
@@ -1109,17 +1312,19 @@ function setupEvents() {
       await setPersistence(auth, browserLocalPersistence);
 
       if (isCapacitorNativeApp()) {
-        // Evita signInWithRedirect en WebView para no perder sessionStorage ni quedar en blanco.
-        // Abre el flujo en navegador externo y permite volver vía brisaplan:// o usar correo/contraseña.
+        try { localStorage.setItem('brisaplan_native_oauth_pending', '1'); } catch {}
+        const redirectUri = getOAuthRedirectUri();
         const authUrl =
           `https://accounts.google.com/o/oauth2/v2/auth` +
           `?client_id=${encodeURIComponent(GOOGLE_OAUTH_CONFIG?.clientId || "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com")}` +
-          `&redirect_uri=${encodeURIComponent("https://tejon876.github.io/brisaplan.github.io/")}` +
+          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
           `&response_type=token%20id_token` +
           `&scope=${encodeURIComponent("openid email profile")}` +
+          `&state=${encodeURIComponent("brisaplan_native")}` +
+          `&prompt=select_account` +
           `&nonce=${Date.now()}`;
         await openExternalAuthFlow(authUrl);
-        toast("Completa el acceso en el navegador o inicia con correo y contraseña.");
+        toast("Elige tu cuenta de Google; volverás automáticamente a BrisaPlan.");
         return;
       }
 
@@ -1178,7 +1383,6 @@ function setupEvents() {
     $('#toggle-vault-pw').textContent = hidden ? 'Ocultar' : 'Mostrar';
   });
 
-  // Navegación
   document.querySelectorAll('[data-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       switchTab(btn.dataset.tab);
@@ -1186,7 +1390,6 @@ function setupEvents() {
     });
   });
 
-  // Agenda semanal controles
   $('#btn-prev-week').addEventListener('click', () => { weekOffset -= 1; renderWeeklyAgenda(); });
   $('#btn-this-week').addEventListener('click', () => { weekOffset = 0; mobileActiveWeekday = todayWeekday(); renderWeeklyAgenda(); });
   $('#btn-next-week').addEventListener('click', () => { weekOffset += 1; renderWeeklyAgenda(); });
@@ -1240,7 +1443,6 @@ function setupEvents() {
     toast('Bloque eliminado');
   });
 
-  // Tareas y entregas
   document.querySelectorAll('[data-open-quick-task]').forEach((btn) => {
     btn.addEventListener('click', () => {
       $('#quick-task-date').value = todayISO();
@@ -1288,7 +1490,6 @@ function setupEvents() {
     toast('Hábito creado');
   });
 
-  // Correos: Modal profesional + Verificación + Rango 1-12 meses + Búsqueda rápida
   $('#btn-open-connect-mail').addEventListener('click', () => {
     $('#connect-mail-label').value = '';
     $('#connect-mail-hint').value = '';
@@ -1376,24 +1577,24 @@ function setupEvents() {
     toast(removed ? `Se limpiaron ${removed} correos spam` : 'No hay spam en esta vista');
   });
 
-  // Instalación y Mi Espacio
   $('#btn-install-mobile-app').addEventListener('click', triggerSmartInstall);
   $('#btn-install-space').addEventListener('click', triggerSmartInstall);
   $('#close-install-modal').addEventListener('click', () => $('#install-guide-modal').classList.remove('open'));
 
   $('#btn-enable-notifs').addEventListener('click', async () => {
-    if (!('Notification' in window)) return toast('Tu navegador no soporta notificaciones.');
-    const perm = await Notification.requestPermission();
-    state.notificationsEnabled = perm === 'granted';
+    const granted = await requestNativeNotificationPermission();
+    state.notificationsEnabled = granted;
     await saveCloudVault();
     renderMiEspacio();
-    if (state.notificationsEnabled) {
-      await showSafeNotification('BrisaPlan', 'Notificaciones activadas correctamente.');
-      toast('Notificaciones activadas');
+    if (granted) {
+      await showSafeNotification('BrisaPlan', 'Notificaciones y recordatorios activados correctamente.');
+      await scheduleAndroidNativeReminders();
+      toast('Notificaciones activadas en este dispositivo');
+    } else {
+      toast('Permiso de notificaciones denegado por el sistema.');
     }
   });
 
-  // Tour Interactivo
   $('#btn-open-tutorial').addEventListener('click', openTutorial);
   $('#tut-skip').addEventListener('click', async () => {
     state.tutorialSeen = true;
@@ -1412,9 +1613,7 @@ function setupEvents() {
     }
   });
 
-  // Delegación global de clics
   document.body.addEventListener('click', async (e) => {
-    // Cuadritos de color
     const swatch = e.target.closest('[data-pick-hex]');
     if (swatch) {
       const hex = swatch.dataset.pickHex;
@@ -1426,7 +1625,6 @@ function setupEvents() {
       return;
     }
 
-    // Selector de día móvil en agenda
     const mobDayBtn = e.target.closest('[data-select-mobile-day]');
     if (mobDayBtn) {
       mobileActiveWeekday = Number(mobDayBtn.dataset.selectMobileDay);
@@ -1434,7 +1632,6 @@ function setupEvents() {
       return;
     }
 
-    // Desvincular cuenta correo
     const unlinkBtn = e.target.closest('[data-act="unlink-mail-acc"]');
     if (unlinkBtn) {
       e.stopPropagation();
@@ -1446,7 +1643,6 @@ function setupEvents() {
       return;
     }
 
-    // Cambiar sesión de cuenta correo
     const sessionChip = e.target.closest('[data-select-mail-session]');
     if (sessionChip) {
       activeMailSession = sessionChip.dataset.selectMailSession;
@@ -1478,6 +1674,10 @@ function setupEvents() {
       activePomoTaskId = id;
       renderTasksAndHabits();
       toast('Tarea vinculada al temporizador Pomodoro');
+    } else if (act === 'toggle-expand-mail') {
+      if (expandedMailIds.has(id)) expandedMailIds.delete(id);
+      else expandedMailIds.add(id);
+      renderMail();
     } else if (act === 'star-mail') {
       toggleMessageImportant(state, id);
       await renderAll();
@@ -1495,7 +1695,6 @@ function setupEvents() {
     }
   });
 
-  // Delegación global de inputs (ruleta de colores)
   document.body.addEventListener('input', async (e) => {
     const wheelGrp = e.target.dataset.wheelGroup;
     if (wheelGrp) {
@@ -1514,7 +1713,6 @@ function setupEvents() {
     }
   });
 
-  // Pomodoro
   $('#pomo-start').addEventListener('click', () => {
     if (pomoTimer) return;
     pomoTimer = setInterval(async () => {
@@ -1542,7 +1740,6 @@ function setupEvents() {
     updatePomodoroText();
   });
 
-  // Cerrar sesión explícito
   $('#btn-logout-only').addEventListener('click', async () => {
     if (!confirm('¿Cerrar sesión en este dispositivo?')) return;
     clearLocalVaultSession(currentUser?.uid);
@@ -1563,6 +1760,7 @@ function setupEvents() {
 document.addEventListener('DOMContentLoaded', async () => {
   await initServiceWorker();
   setupCapacitorAppUrlListener();
+  configureTopInstallButton();
   applyTheme(localStorage.getItem('brisaplan_theme_v7') === 'dark');
   const dueDateInput = $('#task-due-date');
   if (dueDateInput) dueDateInput.value = todayISO();
@@ -1585,12 +1783,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     toast('Modo sin internet activo: tus cambios se guardarán localmente.');
   });
 
-  // Revisar cada 20 segundos si toca notificación de bloque de agenda o entrega
   setInterval(() => {
     checkScheduledNotifications();
   }, 20000);
 
-  // Si arranca sin internet y ya había sesión guardada, entrar directo sin esperar a Firebase Auth
   if (!navigator.onLine) {
     const offlineUser = getOfflineUserProfile();
     if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {
@@ -1602,7 +1798,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (user && !vaultSecret) {
       await handleUserAuthenticated(user);
     } else if (!user && !isUnlocking) {
-      // Si no hay internet, conservar sesión offline local en vez de expulsar al login
       if (!navigator.onLine) {
         const offlineUser = getOfflineUserProfile();
         if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {

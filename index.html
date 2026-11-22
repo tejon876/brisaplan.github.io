@@ -8,9 +8,24 @@
   <meta name="theme-color" content="#4A93C6" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <link rel="stylesheet" href="css/variables.css?v=7.3" />
-  <link rel="stylesheet" href="css/layout.css?v=7.3" />
-  <link rel="stylesheet" href="css/components.css?v=7.3" />
+  <link rel="stylesheet" href="css/variables.css?v=7.4" />
+  <link rel="stylesheet" href="css/layout.css?v=7.4" />
+  <link rel="stylesheet" href="css/components.css?v=7.4" />
+    <script>
+    (function () {
+      try {
+        var hash = window.location.hash || '';
+        var search = window.location.search || '';
+        var combined = search + '&' + hash;
+        var isNative = combined.indexOf('state=brisaplan_native') !== -1 || localStorage.getItem('brisaplan_native_oauth_pending') === '1';
+        if (isNative && (combined.indexOf('id_token=') !== -1 || combined.indexOf('access_token=') !== -1 || combined.indexOf('error=') !== -1)) {
+          localStorage.removeItem('brisaplan_native_oauth_pending');
+          var target = 'brisaplan://auth' + search + hash;
+          window.location.replace(target);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="auth-locked">
@@ -322,7 +337,7 @@
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                   <button id="btn-install-space" type="button" class="btn btn-primary btn-sm">Instalar App</button>
-                  <a id="btn-download-apk" href="https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk" download="BrisaPlan.apk" target="_blank" rel="noopener noreferrer" class="btn btn-soft btn-sm">APK Android</a>
+                  <a id="btn-download-apk" href="https://github.com/tejon876/BrisaPlan/releases/latest/download/BrisaPlan.apk" target="_blank" rel="noopener" class="btn btn-soft btn-sm">APK Android</a>
                 </div>
               </div>
 
@@ -335,24 +350,6 @@
               </div>
             </div>
           </div>
-
-          <section id="android-apk-download" class="card apk-download-card">
-            <div class="card-head">
-              <h2 class="card-title">BrisaPlan para Android</h2>
-            </div>
-            <p class="item-sub" style="margin-bottom:14px;">
-              Descarga la versión más reciente del paquete APK directamente desde el lanzamiento oficial de BrisaPlan.
-            </p>
-            <a
-              id="download-apk-btn"
-              class="btn btn-primary btn-download-apk"
-              href="https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk"
-              download="BrisaPlan.apk"
-              rel="noopener noreferrer"
-            >
-              Descargar BrisaPlan.apk
-            </a>
-          </section>
 
           <div class="card card-peach">
             <div class="card-head">
@@ -542,7 +539,7 @@
           <div class="item-title">iPhone / iPad (Safari)</div>
           <div class="item-sub">Toca el botón <strong>Compartir (□↑)</strong> en la barra inferior y elige <strong>"Agregar a inicio"</strong>.</div>
         </div>
-        <a href="https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk" download="BrisaPlan.apk" target="_blank" rel="noopener noreferrer" class="btn btn-soft" style="width:100%;">Descargar paquete APK Android</a>
+        <a href="https://github.com/tejon876/BrisaPlan/releases/latest/download/BrisaPlan.apk" target="_blank" rel="noopener" class="btn btn-soft" style="width:100%;">Descargar paquete APK Android</a>
       </div>
     </div>
   </div>
@@ -563,6 +560,6 @@
   </div>
 
   <div id="toast" class="toast-banner"></div>
-  <script type="module" src="js/app.js?v=7.3"></script>
+  <script type="module" src="js/app.js?v=7.4"></script>
 </body>
 </html>
