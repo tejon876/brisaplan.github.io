@@ -26,15 +26,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Capacitor & Build Android Project
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Sync web assets and Capacitor Android
         run: |
-          npm install
           mkdir -p www
-          cp -f index.html styles.css app.js manifest.json sw.js www/ 2>/dev/null || true
+          cp -f index.html styles.css app.js manifest.json sw.js www/
+          CAP_BIN="./node_modules/.bin/cap"
           if [ ! -d "android" ]; then
-            npx cap add android
+            "$CAP_BIN" add android
           fi
-          npx cap sync android
+          "$CAP_BIN" sync android
 
       - name: Inject Native Signing, Widgets & Manifest
         run: |
@@ -42,15 +45,14 @@ jobs:
             python3 native-android/inject_native.py
           fi
 
-      - name: Grant execute permission for gradlew & Build Debug APK
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Rename APK
-        run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk BrisaPlan.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk BrisaPlan.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
