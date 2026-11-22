@@ -31,27 +31,30 @@ const db = initializeFirestore(app, {
   localCache: persistentLocalCache()
 });
 
-const STORAGE_KEY = 'brisaplan_v9_state';
-const ONBOARDING_KEY = 'brisaplan_v9_onboarded';
+const STORAGE_KEY = 'brisaplan_v10_state';
+const ONBOARDING_KEY = 'brisaplan_v10_onboarded';
 
 const defaultState = {
   updatedAt: Date.now(),
   darkMode: true,
+  selectedWidgetType: 'hoy',
+  enabledWidgets: { hoy: true, agenda: true, habits: true },
   agenda: [
-    { id: 1, title: 'Redes y Telecomunicaciones', day: 'Lunes', time: '07:00', type: 'permanent', expiresAt: null, color: '#93c5fd' }
+    { id: 1, title: 'Bloque de estudio o trabajo', day: 'Lunes', time: '09:00', type: 'permanent', expiresAt: null, color: '#93c5fd' }
   ],
   tasks: [
-    { id: 101, title: 'Entregar práctica de subredes VLSM', due: '', priority: 'Alta', color: '#fed7aa', done: false }
+    { id: 101, title: 'Revisar pendientes principales de la semana', due: '', priority: 'Alta', color: '#fed7aa', done: false }
   ],
   habits: [
-    { id: 201, name: 'Estudio de idiomas', streak: 4, lastDone: null }
+    { id: 201, name: 'Lectura o práctica diaria', streak: 3, lastDone: null }
   ],
   mails: [
-    { id: 301, account: 'alumno@uteq.edu.mx', subject: 'Aviso de coordinación académica', category: 'Universidad' }
+    { id: 301, account: 'usuario@ejemplo.com', subject: 'Bienvenido a tu organizador de correos', category: 'Importante' }
   ]
 };
 
 let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultState;
+if (!state.enabledWidgets) state.enabledWidgets = { hoy: true, agenda: true, habits: true };
 let currentUser = null;
 let unsubscribeSnapshot = null;
 let isApplyingRemote = false;
@@ -61,6 +64,7 @@ const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
 const LocalNotifications = Cap?.Plugins?.LocalNotifications;
 const Preferences = Cap?.Plugins?.Preferences;
 const GoogleAuth = Cap?.Plugins?.GoogleAuth;
+const BrisaWidgetBridge = Cap?.Plugins?.BrisaWidgetBridge;
 
 if (isNative && GoogleAuth) {
   GoogleAuth.initialize({
@@ -75,21 +79,44 @@ function showToast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  window.__toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
-async function syncNativeWidget() {
+function getWidgetStrings() {
   const pending = state.tasks.filter((t) => !t.done);
-  const summary = pending.length === 0
-    ? 'Todo al día • 0 entregas pendientes'
+  const hoyTitle = pending.length === 0
+    ? 'Todo al día • 0 pendientes'
     : `${pending.length} pendiente${pending.length > 1 ? 's' : ''} • ${state.habits.length} hábitos`;
-  const nextTask = pending.length > 0
+  const hoySub = pending.length > 0
     ? `Siguiente: ${pending[0].title} (${pending[0].priority})`
-    : 'Toca para revisar tu agenda';
+    : 'Toca para abrir BrisaPlan';
 
+  const ag1 = state.agenda.length > 0
+    ? `${state.agenda[0].day} ${state.agenda[0].time} • ${state.agenda[0].title}`
+    : 'Sin bloques programados';
+  const ag2 = state.agenda.length > 1
+    ? `Luego: ${state.agenda[1].day} ${state.agenda[1].time} • ${state.agenda[1].title}`
+    : `${state.agenda.length} bloque(s) en tu agenda`;
+
+  const topHabit = state.habits[0];
+  const habTitle = topHabit ? `${topHabit.name}: ${topHabit.streak} días` : 'Sin hábitos activos';
+  const habSub = `${state.habits.length} hábito(s) en seguimiento diario`;
+
+  return { hoyTitle, hoySub, ag1, ag2, habTitle, habSub };
+}
+
+async function syncNativeWidgets() {
+  const w = getWidgetStrings();
   if (Preferences) {
-    await Preferences.set({ key: 'brisaplan_widget_summary', value: summary }).catch(() => {});
-    await Preferences.set({ key: 'brisaplan_widget_next', value: nextTask }).catch(() => {});
+    await Preferences.set({ key: 'bp_w_hoy_title', value: state.enabledWidgets.hoy ? w.hoyTitle : 'Widget pausado' }).catch(() => {});
+    await Preferences.set({ key: 'bp_w_hoy_sub', value: w.hoySub }).catch(() => {});
+    await Preferences.set({ key: 'bp_w_agenda_1', value: state.enabledWidgets.agenda ? w.ag1 : 'Widget pausado' }).catch(() => {});
+    await Preferences.set({ key: 'bp_w_agenda_2', value: w.ag2 }).catch(() => {});
+    await Preferences.set({ key: 'bp_w_habit_title', value: state.enabledWidgets.habits ? w.habTitle : 'Widget pausado' }).catch(() => {});
+    await Preferences.set({ key: 'bp_w_habit_sub', value: w.habSub }).catch(() => {});
+  }
+  if (BrisaWidgetBridge && BrisaWidgetBridge.refreshAll) {
+    await BrisaWidgetBridge.refreshAll().catch(() => {});
   }
 }
 
@@ -97,62 +124,218 @@ let cloudSyncTimeout = null;
 function saveState(silent = false) {
   state.updatedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  syncNativeWidget();
-  if (!silent) showToast('Guardado localmente');
+  syncNativeWidgets();
+  if (!silent) showToast('Guardado');
 
   if (currentUser && !isApplyingRemote) {
-    setSyncBadge('Sincronizando...');
+    setSyncChip('Sincronizando...');
     clearTimeout(cloudSyncTimeout);
     cloudSyncTimeout = setTimeout(async () => {
       try {
         await setDoc(doc(db, 'users', currentUser.uid), state, { merge: true });
-        setSyncBadge(navigator.onLine ? 'Sincronizado' : 'Offline (En cola)');
+        setSyncChip(navigator.onLine ? 'Sincronizado' : 'Offline (En cola)');
       } catch (_) {
-        setSyncBadge('Offline (Guardado)');
+        setSyncChip('Offline (Guardado)');
       }
     }, 450);
   }
 }
 
-function setSyncBadge(text) {
-  const pill = document.getElementById('syncPill');
+function setSyncChip(text) {
+  const chip = document.getElementById('syncChip');
   const label = document.getElementById('syncText');
   label.textContent = text;
-  if (!navigator.onLine) {
-    pill.classList.add('offline');
-  } else {
-    pill.classList.remove('offline');
-  }
+  chip.classList.toggle('offline', !navigator.onLine);
 }
 
 function updateNetworkUI() {
   const online = navigator.onLine;
-  setSyncBadge(online ? (currentUser ? 'En línea' : 'Local listo') : 'Modo Offline');
-  const mailBanner = document.getElementById('mailOfflineBanner');
-  const mailBadge = document.getElementById('mailNetBadge');
+  setSyncChip(online ? (currentUser ? 'Sincronizado' : 'Local') : 'Offline');
+  const alert = document.getElementById('mailOfflineAlert');
+  const tag = document.getElementById('mailNetTag');
   if (online) {
-    mailBanner.classList.remove('visible');
-    mailBadge.textContent = 'En línea';
+    alert.classList.remove('show');
+    tag.textContent = 'En línea';
   } else {
-    mailBanner.classList.add('visible');
-    mailBadge.textContent = 'Sin red (Caché)';
+    alert.classList.add('show');
+    tag.textContent = 'Sin red (Caché)';
   }
 }
 window.addEventListener('online', updateNetworkUI);
 window.addEventListener('offline', updateNetworkUI);
 updateNetworkUI();
 
+// FLOATING WIDGET STUDIO (PREVIEW + SELECT/DESELECT + 1-CLICK PIN)
+const widgetStudioModal = document.getElementById('widgetStudioModal');
+function updateWidgetPreviewUI() {
+  const type = state.selectedWidgetType || 'hoy';
+  const w = getWidgetStrings();
+  const mockTag = document.getElementById('mockTag');
+  const mockTitle = document.getElementById('mockTitle');
+  const mockSub = document.getElementById('mockSub');
+  const enabledCheck = document.getElementById('widgetEnabledCheck');
+
+  document.querySelectorAll('.widget-opt').forEach((el) => {
+    el.classList.toggle('selected', el.dataset.wtype === type);
+  });
+
+  enabledCheck.checked = !!state.enabledWidgets[type];
+
+  if (type === 'agenda') {
+    mockTag.textContent = 'BRISAPLAN • AGENDA';
+    mockTag.style.color = '#fed7aa';
+    mockTitle.textContent = w.ag1;
+    mockSub.textContent = w.ag2;
+  } else if (type === 'habits') {
+    mockTag.textContent = 'BRISAPLAN • RACHAS';
+    mockTag.style.color = '#6ee7b7';
+    mockTitle.textContent = w.habTitle;
+    mockSub.textContent = w.habSub;
+  } else {
+    mockTag.textContent = 'BRISAPLAN • HOY';
+    mockTag.style.color = '#93c5fd';
+    mockTitle.textContent = w.hoyTitle;
+    mockSub.textContent = w.hoySub;
+  }
+}
+
+document.getElementById('openWidgetStudioBtn').addEventListener('click', () => {
+  updateWidgetPreviewUI();
+  widgetStudioModal.classList.add('open');
+});
+document.getElementById('openWidgetStudioBtn2').addEventListener('click', () => {
+  updateWidgetPreviewUI();
+  widgetStudioModal.classList.add('open');
+});
+document.getElementById('closeWidgetStudioBtn').addEventListener('click', () => widgetStudioModal.classList.remove('open'));
+
+document.querySelectorAll('.widget-opt').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    state.selectedWidgetType = btn.dataset.wtype;
+    saveState(true);
+    updateWidgetPreviewUI();
+  });
+});
+
+document.getElementById('widgetEnabledCheck').addEventListener('change', (e) => {
+  const type = state.selectedWidgetType || 'hoy';
+  state.enabledWidgets[type] = e.target.checked;
+  saveState(true);
+  showToast(e.target.checked ? 'Widget activado' : 'Widget pausado');
+});
+
+document.getElementById('pinWidgetOneClickBtn').addEventListener('click', async () => {
+  const type = state.selectedWidgetType || 'hoy';
+  state.enabledWidgets[type] = true;
+  await syncNativeWidgets();
+
+  if (isNative && BrisaWidgetBridge && BrisaWidgetBridge.pinWidget) {
+    try {
+      const res = await BrisaWidgetBridge.pinWidget({ type });
+      if (res && res.pinned) {
+        showToast('Confirma en la ventana de Android para fijarlo');
+      } else {
+        showToast('Mantén presionado tu fondo de pantalla > Widgets > BrisaPlan');
+      }
+    } catch (_) {
+      showToast('Abre Widgets en tu pantalla de inicio y busca BrisaPlan');
+    }
+  } else {
+    showToast('Función de fijado directo disponible en la App Android');
+  }
+});
+
+// INTERACTIVE TUTORIAL
+const TUTORIAL_STEPS = [
+  {
+    title: '1. Agenda Base y Ajustes Temporales',
+    body: 'Define tu horario fijo semanal y agrega cambios temporales por un número específico de días. Cuando expiran, tu rutina normal regresa sola.'
+  },
+  {
+    title: '2. Entregas con Alertas Inteligentes',
+    body: 'Asigna prioridad Alta, Media o Baja a tus tareas. BrisaPlan te enviará notificaciones nativas escalonadas antes de la hora límite.'
+  },
+  {
+    title: '3. Widgets Flotantes y Modo Offline',
+    body: 'Todo funciona sin internet. Desde "Widgets de inicio" puedes previsualizar qué tarjeta te gusta más y fijarla en tu teléfono con un clic.'
+  },
+  {
+    title: '4. Respaldo Opcional en la Nube',
+    body: 'Toca "Acceder" arriba a la derecha si deseas conectar tu cuenta de Google y sincronizar tus datos entre celular y computadora.'
+  }
+];
+let tutIndex = 0;
+const tutorialModal = document.getElementById('tutorialModal');
+
+function renderTutorialStep() {
+  const step = TUTORIAL_STEPS[tutIndex];
+  document.getElementById('tutStepTitle').textContent = step.title;
+  document.getElementById('tutStepBody').textContent = step.body;
+  document.getElementById('tutCounter').textContent = `Paso ${tutIndex + 1} de ${TUTORIAL_STEPS.length}`;
+  document.getElementById('tutPrevBtn').style.visibility = tutIndex === 0 ? 'hidden' : 'visible';
+  document.getElementById('tutNextBtn').textContent = tutIndex === TUTORIAL_STEPS.length - 1 ? 'Finalizar' : 'Siguiente';
+}
+
+document.getElementById('openTutorialBtn').addEventListener('click', () => {
+  tutIndex = 0;
+  renderTutorialStep();
+  tutorialModal.classList.add('open');
+});
+document.getElementById('closeTutBtn').addEventListener('click', () => tutorialModal.classList.remove('open'));
+document.getElementById('tutPrevBtn').addEventListener('click', () => {
+  if (tutIndex > 0) { tutIndex--; renderTutorialStep(); }
+});
+document.getElementById('tutNextBtn').addEventListener('click', () => {
+  if (tutIndex < TUTORIAL_STEPS.length - 1) {
+    tutIndex++;
+    renderTutorialStep();
+  } else {
+    tutorialModal.classList.remove('open');
+  }
+});
+
+// ONE-CLICK PERMISSIONS
+const permsModal = document.getElementById('permsModal');
+document.getElementById('quickPermsBtn').addEventListener('click', () => permsModal.classList.add('open'));
+document.getElementById('openPermsBtn2').addEventListener('click', () => permsModal.classList.add('open'));
+document.getElementById('closePermsBtn').addEventListener('click', () => {
+  localStorage.setItem(ONBOARDING_KEY, '1');
+  permsModal.classList.remove('open');
+});
+document.getElementById('openWidgetFromPermBtn').addEventListener('click', () => {
+  permsModal.classList.remove('open');
+  updateWidgetPreviewUI();
+  widgetStudioModal.classList.add('open');
+});
+
+document.getElementById('reqNotifPermBtn').addEventListener('click', async () => {
+  if (LocalNotifications) {
+    const res = await LocalNotifications.requestPermissions();
+    const granted = res.display === 'granted';
+    document.getElementById('notifPermStatus').textContent = granted ? 'Permiso activo correctamente.' : 'Actívalo en Ajustes > Aplicaciones > BrisaPlan.';
+    showToast(granted ? 'Notificaciones activadas' : 'Permiso pendiente en ajustes');
+  } else if ('Notification' in window) {
+    const p = await Notification.requestPermission();
+    showToast(p === 'granted' ? 'Notificaciones web activadas' : 'Permiso no concedido');
+  }
+});
+
+if (!localStorage.getItem(ONBOARDING_KEY)) {
+  setTimeout(() => permsModal.classList.add('open'), 600);
+}
+
+// AUTH & CLEAR VISUAL SESSION INDICATOR
 const accountModal = document.getElementById('accountModal');
-document.getElementById('accountTrigger').addEventListener('click', () => accountModal.classList.add('open'));
+document.getElementById('accountBtn').addEventListener('click', () => accountModal.classList.add('open'));
 document.getElementById('closeAccountBtn').addEventListener('click', () => accountModal.classList.remove('open'));
 
 document.getElementById('googleSignInBtn').addEventListener('click', async () => {
   try {
-    showToast('Abriendo selector de cuentas...');
+    showToast('Conectando con Google...');
     if (isNative && GoogleAuth) {
       const googleUser = await GoogleAuth.signIn();
       const idToken = googleUser?.authentication?.idToken;
-      if (!idToken) throw new Error('No se recibió token de Google');
+      if (!idToken) throw new Error('Token no recibido');
       const credential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, credential);
     } else {
@@ -161,17 +344,15 @@ document.getElementById('googleSignInBtn').addEventListener('click', async () =>
       await signInWithPopup(auth, provider);
     }
     accountModal.classList.remove('open');
-    showToast('Sesión iniciada correctamente');
+    showToast('Sesión iniciada');
   } catch (err) {
-    showToast('No se pudo completar el acceso: ' + (err?.message || 'intenta de nuevo'));
+    showToast('Error al iniciar sesión: ' + (err?.message || 'revisa tu conexión'));
   }
 });
 
 document.getElementById('googleSignOutBtn').addEventListener('click', async () => {
   try {
-    if (isNative && GoogleAuth) {
-      await GoogleAuth.signOut().catch(() => {});
-    }
+    if (isNative && GoogleAuth) await GoogleAuth.signOut().catch(() => {});
     await signOut(auth);
     accountModal.classList.remove('open');
     showToast('Sesión cerrada');
@@ -186,6 +367,7 @@ onAuthStateChanged(auth, (user) => {
   const loggedInView = document.getElementById('loggedInView');
   const userLabel = document.getElementById('userLabel');
   const userAvatar = document.getElementById('userAvatar');
+  const accountBtn = document.getElementById('accountBtn');
 
   if (unsubscribeSnapshot) {
     unsubscribeSnapshot();
@@ -193,16 +375,20 @@ onAuthStateChanged(auth, (user) => {
   }
 
   if (user) {
+    accountBtn.classList.add('signed-in');
     loggedOutView.style.display = 'none';
     loggedInView.style.display = 'block';
     const displayName = user.displayName || user.email.split('@')[0];
-    userLabel.textContent = displayName.split(' ')[0];
+    const firstName = displayName.split(' ')[0];
+    userLabel.textContent = `${firstName} ✓`;
+    document.getElementById('heroGreeting').textContent = `Hola, ${firstName}`;
+    document.getElementById('heroSub').textContent = `Sesión activa (${user.email}) • Sincronización en la nube lista.`;
     document.getElementById('sheetUserName').textContent = displayName;
     document.getElementById('sheetUserEmail').textContent = user.email;
 
     if (user.photoURL) {
-      userAvatar.innerHTML = `<img src="${user.photoURL}" alt="Avatar" />`;
-      document.getElementById('sheetAvatar').innerHTML = `<img src="${user.photoURL}" alt="Avatar" />`;
+      userAvatar.innerHTML = `<img src="${user.photoURL}" alt="Perfil" />`;
+      document.getElementById('sheetAvatar').innerHTML = `<img src="${user.photoURL}" alt="Perfil" />`;
     } else {
       const initial = displayName.charAt(0).toUpperCase();
       userAvatar.textContent = initial;
@@ -222,17 +408,21 @@ onAuthStateChanged(auth, (user) => {
         renderAll();
         isApplyingRemote = false;
       }
-      setSyncBadge(navigator.onLine ? 'Sincronizado' : 'Offline');
+      setSyncChip(navigator.onLine ? 'Sincronizado' : 'Offline');
     });
   } else {
+    accountBtn.classList.remove('signed-in');
     loggedOutView.style.display = 'block';
     loggedInView.style.display = 'none';
     userLabel.textContent = 'Acceder';
     userAvatar.textContent = 'G';
-    setSyncBadge('Local listo');
+    document.getElementById('heroGreeting').textContent = 'Organiza tu día con calma';
+    document.getElementById('heroSub').textContent = 'Todo funciona sin internet y se respalda en tu cuenta cuando te conectas.';
+    setSyncChip('Local');
   }
 });
 
+// NOTIFICATIONS
 const PRIORITY_OFFSETS_MINUTES = {
   Alta: [1440, 120, 30],
   Media: [360, 60],
@@ -277,7 +467,7 @@ document.getElementById('testNotifBtn').addEventListener('click', async () => {
         notifications: [{
           id: 99999,
           title: 'BrisaPlan • Alerta de Prueba',
-          body: 'Las notificaciones nativas están funcionando correctamente.',
+          body: 'Las notificaciones nativas están activas.',
           schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true }
         }]
       });
@@ -286,51 +476,33 @@ document.getElementById('testNotifBtn').addEventListener('click', async () => {
       showToast('Activa el permiso de notificaciones');
     }
   } else {
-    showToast('Prueba disponible al instalar el APK en Android');
+    showToast('Prueba disponible en la app Android');
   }
 });
 
-const permsModal = document.getElementById('permsModal');
-document.getElementById('openPermsBtn').addEventListener('click', () => permsModal.classList.add('open'));
-document.getElementById('closePermsBtn').addEventListener('click', () => {
-  localStorage.setItem(ONBOARDING_KEY, '1');
-  permsModal.classList.remove('open');
-});
-
-document.getElementById('reqNotifPermBtn').addEventListener('click', async () => {
-  if (LocalNotifications) {
-    const res = await LocalNotifications.requestPermissions();
-    showToast(res.display === 'granted' ? 'Permiso concedido' : 'Permiso denegado en ajustes');
-  } else {
-    showToast('Permisos gestionados por Android al abrir el APK');
-  }
-});
-
-if (!localStorage.getItem(ONBOARDING_KEY)) {
-  setTimeout(() => permsModal.classList.add('open'), 600);
-}
-
-const themeToggle = document.getElementById('themeToggle');
+// THEME & NAVIGATION
+const themeBtn = document.getElementById('themeBtn');
 function applyTheme() {
   document.body.classList.toggle('dark-mode', state.darkMode);
-  themeToggle.textContent = state.darkMode ? 'Claro' : 'Oscuro';
+  themeBtn.textContent = state.darkMode ? 'Claro' : 'Oscuro';
 }
-themeToggle.addEventListener('click', () => {
+themeBtn.addEventListener('click', () => {
   state.darkMode = !state.darkMode;
   applyTheme();
   saveState(true);
 });
 applyTheme();
 
-document.querySelectorAll('.nav-btn').forEach((btn) => {
+document.querySelectorAll('.tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.view-section').forEach((s) => s.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.view-panel').forEach((s) => s.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.target).classList.add('active');
   });
 });
 
+// AGENDA
 function renderAgenda() {
   const list = document.getElementById('agendaList');
   const now = Date.now();
@@ -339,7 +511,7 @@ function renderAgenda() {
 
   state.agenda.forEach((item) => {
     const div = document.createElement('div');
-    div.className = 'list-item';
+    div.className = 'row-item';
     div.style.borderLeftColor = item.color || '#93c5fd';
     const tag = item.type === 'override'
       ? `Temporal (expira ${new Date(item.expiresAt).toLocaleDateString()})`
@@ -347,7 +519,7 @@ function renderAgenda() {
     div.innerHTML = `
       <div>
         <strong>${item.day} • ${item.time}</strong> — ${item.title}
-        <div class="item-meta">${tag}</div>
+        <div class="row-sub">${tag}</div>
       </div>
       <button class="btn" data-del-agenda="${item.id}">Quitar</button>
     `;
@@ -379,16 +551,17 @@ document.getElementById('addAgendaBtn').addEventListener('click', () => {
   renderAgenda();
 });
 
+// POMODORO
 let pomoSeconds = 25 * 60;
 let pomoTimer = null;
 function updatePomoUI() {
   const m = String(Math.floor(pomoSeconds / 60)).padStart(2, '0');
   const s = String(pomoSeconds % 60).padStart(2, '0');
-  document.getElementById('pomoDisplay').textContent = `${m}:${s}`;
+  document.getElementById('pomoClock').textContent = `${m}:${s}`;
 }
 document.getElementById('pomoStart').addEventListener('click', () => {
   if (pomoTimer) return;
-  document.getElementById('pomoStatus').textContent = 'Activo';
+  document.getElementById('pomoTag').textContent = 'En curso';
   pomoTimer = setInterval(() => {
     if (pomoSeconds > 0) {
       pomoSeconds--;
@@ -396,35 +569,36 @@ document.getElementById('pomoStart').addEventListener('click', () => {
     } else {
       clearInterval(pomoTimer);
       pomoTimer = null;
-      document.getElementById('pomoStatus').textContent = 'Listo';
+      document.getElementById('pomoTag').textContent = 'Completado';
     }
   }, 1000);
 });
 document.getElementById('pomoPause').addEventListener('click', () => {
   clearInterval(pomoTimer);
   pomoTimer = null;
-  document.getElementById('pomoStatus').textContent = 'Pausado';
+  document.getElementById('pomoTag').textContent = 'Pausado';
 });
 document.getElementById('pomoReset').addEventListener('click', () => {
   clearInterval(pomoTimer);
   pomoTimer = null;
   pomoSeconds = 25 * 60;
   updatePomoUI();
-  document.getElementById('pomoStatus').textContent = 'Pomodoro';
+  document.getElementById('pomoTag').textContent = 'Pomodoro';
 });
 
+// TASKS
 function renderTasks() {
   const list = document.getElementById('taskList');
   list.innerHTML = '';
   state.tasks.forEach((t) => {
     const div = document.createElement('div');
-    div.className = `list-item ${t.done ? 'completed' : ''}`;
+    div.className = `row-item ${t.done ? 'done' : ''}`;
     div.style.borderLeftColor = t.color || '#fed7aa';
-    const dueLabel = t.due ? `Vence: ${new Date(t.due).toLocaleString()}` : 'Sin hora límite';
+    const dueLabel = t.due ? `Límite: ${new Date(t.due).toLocaleString()}` : 'Sin hora límite';
     div.innerHTML = `
       <div style="cursor:pointer; flex:1;" data-toggle-task="${t.id}">
-        <div class="item-title"><strong>[${t.priority}]</strong> ${t.title}</div>
-        <div class="item-meta">${dueLabel}</div>
+        <div class="row-title"><strong>[${t.priority}]</strong> ${t.title}</div>
+        <div class="row-sub">${dueLabel}</div>
       </div>
       <button class="btn" data-del-task="${t.id}">Borrar</button>
     `;
@@ -464,6 +638,7 @@ document.getElementById('addTaskBtn').addEventListener('click', async () => {
   await schedulePriorityNotifications(task);
 });
 
+// HABITS
 function renderHabits() {
   const grid = document.getElementById('habitGrid');
   grid.innerHTML = '';
@@ -472,11 +647,11 @@ function renderHabits() {
   state.habits.forEach((h) => {
     const doneToday = h.lastDone === todayStr;
     const card = document.createElement('div');
-    card.className = 'habit-card';
+    card.className = 'habit-box';
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <strong>${h.name}</strong>
-        <span class="badge">${h.streak} días</span>
+        <span class="tag">${h.streak} días</span>
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn ${doneToday ? '' : 'btn-primary'}" data-check-habit="${h.id}">
@@ -518,6 +693,7 @@ document.getElementById('addHabitBtn').addEventListener('click', () => {
   renderHabits();
 });
 
+// MAILS
 function renderMails() {
   const list = document.getElementById('mailList');
   const hideSpam = document.getElementById('hideSpamCheck').checked;
@@ -527,11 +703,11 @@ function renderMails() {
     .filter((m) => !(hideSpam && m.category === 'Spam'))
     .forEach((m) => {
       const div = document.createElement('div');
-      div.className = 'list-item';
+      div.className = 'row-item';
       div.innerHTML = `
         <div>
           <strong>${m.subject}</strong>
-          <div class="item-meta">${m.account} • ${m.category}</div>
+          <div class="row-sub">${m.account} • ${m.category}</div>
         </div>
         <button class="btn" data-del-mail="${m.id}">Archivar</button>
       `;
@@ -549,7 +725,7 @@ function renderMails() {
 
 document.getElementById('hideSpamCheck').addEventListener('change', renderMails);
 document.getElementById('addMailBtn').addEventListener('click', () => {
-  const account = document.getElementById('mailAccount').value.trim() || 'principal@gmail.com';
+  const account = document.getElementById('mailAccount').value.trim() || 'usuario@ejemplo.com';
   const subject = document.getElementById('mailSubject').value.trim();
   if (!subject) return;
   const category = document.getElementById('mailCategory').value;
@@ -559,11 +735,7 @@ document.getElementById('addMailBtn').addEventListener('click', () => {
   renderMails();
 });
 
-document.getElementById('forceWidgetSyncBtn').addEventListener('click', async () => {
-  await syncNativeWidget();
-  showToast('Datos enviados al Widget de Android');
-});
-
+// ARCO PRIVACY
 const arcoModal = document.getElementById('arcoModal');
 document.getElementById('openArcoBtn').addEventListener('click', () => arcoModal.classList.add('open'));
 document.getElementById('closeArcoBtn').addEventListener('click', () => arcoModal.classList.remove('open'));
@@ -583,7 +755,7 @@ document.getElementById('wipeDataBtn').addEventListener('click', () => {
   saveState();
   renderAll();
   arcoModal.classList.remove('open');
-  showToast('Datos locales eliminados');
+  showToast('Datos eliminados');
 });
 
 function renderAll() {
@@ -591,7 +763,7 @@ function renderAll() {
   renderTasks();
   renderHabits();
   renderMails();
-  syncNativeWidget();
+  syncNativeWidgets();
 }
 
 if ('serviceWorker' in navigator) {
