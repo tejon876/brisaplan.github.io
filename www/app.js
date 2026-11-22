@@ -165,6 +165,7 @@ window.addEventListener('online', updateNetworkUI);
 window.addEventListener('offline', updateNetworkUI);
 updateNetworkUI();
 
+// FLOATING WIDGET STUDIO (PREVIEW + SELECT/DESELECT + 1-CLICK PIN)
 const widgetStudioModal = document.getElementById('widgetStudioModal');
 function updateWidgetPreviewUI() {
   const type = state.selectedWidgetType || 'hoy';
@@ -244,6 +245,7 @@ document.getElementById('pinWidgetOneClickBtn').addEventListener('click', async 
   }
 });
 
+// INTERACTIVE TUTORIAL
 const TUTORIAL_STEPS = [
   {
     title: '1. Agenda Base y Ajustes Temporales',
@@ -292,6 +294,7 @@ document.getElementById('tutNextBtn').addEventListener('click', () => {
   }
 });
 
+// ONE-CLICK PERMISSIONS
 const permsModal = document.getElementById('permsModal');
 document.getElementById('quickPermsBtn').addEventListener('click', () => permsModal.classList.add('open'));
 document.getElementById('openPermsBtn2').addEventListener('click', () => permsModal.classList.add('open'));
@@ -321,6 +324,7 @@ if (!localStorage.getItem(ONBOARDING_KEY)) {
   setTimeout(() => permsModal.classList.add('open'), 600);
 }
 
+// AUTH & CLEAR VISUAL SESSION INDICATOR
 const accountModal = document.getElementById('accountModal');
 document.getElementById('accountBtn').addEventListener('click', () => accountModal.classList.add('open'));
 document.getElementById('closeAccountBtn').addEventListener('click', () => accountModal.classList.remove('open'));
@@ -418,6 +422,7 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
+// NOTIFICATIONS
 const PRIORITY_OFFSETS_MINUTES = {
   Alta: [1440, 120, 30],
   Media: [360, 60],
@@ -475,6 +480,7 @@ document.getElementById('testNotifBtn').addEventListener('click', async () => {
   }
 });
 
+// THEME & NAVIGATION
 const themeBtn = document.getElementById('themeBtn');
 function applyTheme() {
   document.body.classList.toggle('dark-mode', state.darkMode);
@@ -496,6 +502,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
   });
 });
 
+// AGENDA
 function renderAgenda() {
   const list = document.getElementById('agendaList');
   const now = Date.now();
@@ -544,6 +551,7 @@ document.getElementById('addAgendaBtn').addEventListener('click', () => {
   renderAgenda();
 });
 
+// POMODORO
 let pomoSeconds = 25 * 60;
 let pomoTimer = null;
 function updatePomoUI() {
@@ -578,6 +586,7 @@ document.getElementById('pomoReset').addEventListener('click', () => {
   document.getElementById('pomoTag').textContent = 'Pomodoro';
 });
 
+// TASKS
 function renderTasks() {
   const list = document.getElementById('taskList');
   list.innerHTML = '';
@@ -629,6 +638,7 @@ document.getElementById('addTaskBtn').addEventListener('click', async () => {
   await schedulePriorityNotifications(task);
 });
 
+// HABITS
 function renderHabits() {
   const grid = document.getElementById('habitGrid');
   grid.innerHTML = '';
@@ -683,6 +693,7 @@ document.getElementById('addHabitBtn').addEventListener('click', () => {
   renderHabits();
 });
 
+// MAILS
 function renderMails() {
   const list = document.getElementById('mailList');
   const hideSpam = document.getElementById('hideSpamCheck').checked;
@@ -724,6 +735,7 @@ document.getElementById('addMailBtn').addEventListener('click', () => {
   renderMails();
 });
 
+// ARCO PRIVACY
 const arcoModal = document.getElementById('arcoModal');
 document.getElementById('openArcoBtn').addEventListener('click', () => arcoModal.classList.add('open'));
 document.getElementById('closeArcoBtn').addEventListener('click', () => arcoModal.classList.remove('open'));
