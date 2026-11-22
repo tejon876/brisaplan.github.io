@@ -29,10 +29,18 @@ jobs:
       - name: Install Capacitor & Build Android Project
         run: |
           npm install
+          mkdir -p www
+          cp -f index.html styles.css app.js manifest.json sw.js www/ 2>/dev/null || true
           if [ ! -d "android" ]; then
             npx cap add android
           fi
           npx cap sync android
+
+      - name: Inject Native Signing, Widgets & Manifest
+        run: |
+          if [ -f "native-android/inject_native.py" ]; then
+            python3 native-android/inject_native.py
+          fi
 
       - name: Grant execute permission for gradlew & Build Debug APK
         run: |
@@ -53,7 +61,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v8.0.${{ github.run_number }}
-          name: BrisaPlan v8.0.${{ github.run_number }}
+          tag_name: v10.0.${{ github.run_number }}
+          name: BrisaPlan v10.0.${{ github.run_number }}
           files: BrisaPlan.apk
           make_latest: true
