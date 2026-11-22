@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>BrisaPlan v8</title>
+  <title>BrisaPlan v9</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -13,23 +13,30 @@
     <div class="brand">
       <div class="brand-dot"></div>
       <h1>BrisaPlan</h1>
+      <span class="sync-pill" id="syncPill">
+        <span class="sync-dot"></span>
+        <span id="syncText">Listo</span>
+      </span>
     </div>
     <div class="header-actions">
-      <button id="themeToggle" class="btn" title="Cambiar tema">Modo Claro</button>
-      <button id="authBtn" class="btn btn-primary">Conectar Google</button>
+      <button id="themeToggle" class="btn">Claro</button>
+      <button id="accountTrigger" class="avatar-btn">
+        <span class="avatar-circle" id="userAvatar">G</span>
+        <span id="userLabel">Acceder</span>
+      </button>
     </div>
   </header>
 
   <main class="container">
-    <!-- SECCIÓN 1: AGENDA SEMANAL + EXCEPCIONES TEMPORALES -->
+    <!-- 1. AGENDA BASE Y TEMPORAL (100% OFFLINE/ONLINE) -->
     <section id="view-agenda" class="view-section active">
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Agenda Base y Ajustes Temporales</h2>
-          <span class="badge" id="todayLabel">Hoy</span>
+          <h2 class="card-title">Agenda Semanal y Ajustes Temporales</h2>
+          <span class="badge">Offline-First</span>
         </div>
         <div class="form-row">
-          <input type="text" id="agendaTitle" placeholder="Bloque o clase (ej. Redes CCNA)" />
+          <input type="text" id="agendaTitle" placeholder="Clase o actividad (ej. Redes CCNA)" />
           <select id="agendaDay">
             <option value="Lunes">Lunes</option>
             <option value="Martes">Martes</option>
@@ -42,9 +49,9 @@
           <input type="time" id="agendaTime" value="07:00" />
           <select id="agendaType">
             <option value="permanent">Base Permanente</option>
-            <option value="override">Ajuste Temporal (Días)</option>
+            <option value="override">Temporal (Días)</option>
           </select>
-          <input type="number" id="overrideDays" min="1" max="30" value="3" style="width: 72px;" title="Días de vigencia" />
+          <input type="number" id="overrideDays" min="1" max="30" value="3" style="width: 68px;" title="Días" />
           <input type="color" id="agendaColor" value="#93c5fd" />
           <button id="addAgendaBtn" class="btn btn-primary">Guardar</button>
         </div>
@@ -52,15 +59,15 @@
       </div>
     </section>
 
-    <!-- SECCIÓN 2: TAREAS PRIORITARIAS + POMODORO -->
+    <!-- 2. ENTREGAS, TAREAS CON NOTIFICACIÓN ESCALONADA Y POMODORO -->
     <section id="view-tasks" class="view-section">
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Enfoque Pomodoro y Tareas</h2>
-          <span class="badge" id="pomoStatus">Listo</span>
+          <h2 class="card-title">Entregas, Prioridades y Alertas</h2>
+          <span class="badge" id="pomoStatus">Pomodoro</span>
         </div>
         <div class="pomodoro-box">
-          <div style="font-size: 0.85rem; color: var(--text-secondary);">Sesión de concentración</div>
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">Sesión de enfoque</div>
           <div class="pomodoro-time" id="pomoDisplay">25:00</div>
           <div style="display: flex; gap: 8px; justify-content: center;">
             <button id="pomoStart" class="btn btn-primary">Iniciar</button>
@@ -68,41 +75,46 @@
             <button id="pomoReset" class="btn">Reiniciar</button>
           </div>
         </div>
+
         <div class="form-row">
-          <input type="text" id="taskInput" placeholder="Nueva tarea prioritaria..." />
-          <select id="taskPriority">
-            <option value="Alta">Alta</option>
-            <option value="Media" selected>Media</option>
-            <option value="Baja">Baja</option>
+          <input type="text" id="taskInput" placeholder="Nueva entrega o tarea..." />
+          <input type="datetime-local" id="taskDue" title="Fecha y hora de vencimiento" />
+          <select id="taskPriority" title="Nivel de alerta">
+            <option value="Alta">Prioridad Alta (avisa 24h, 2h y 30m antes)</option>
+            <option value="Media" selected>Prioridad Media (avisa 6h y 1h antes)</option>
+            <option value="Baja">Prioridad Baja (avisa 2h antes)</option>
           </select>
           <input type="color" id="taskColor" value="#fed7aa" />
-          <button id="addTaskBtn" class="btn btn-primary">Agregar</button>
+          <button id="addTaskBtn" class="btn btn-primary">Programar</button>
         </div>
         <div id="taskList" class="item-list"></div>
       </div>
     </section>
 
-    <!-- SECCIÓN 3: HÁBITOS Y RACHAS -->
+    <!-- 3. HÁBITOS Y RACHAS (100% OFFLINE/ONLINE) -->
     <section id="view-habits" class="view-section">
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Seguimiento de Hábitos</h2>
-          <span class="badge">Rachas Activas</span>
+          <h2 class="card-title">Hábitos y Rachas Diarias</h2>
+          <span class="badge">Auto-guardado</span>
         </div>
         <div class="form-row">
           <input type="text" id="habitInput" placeholder="Ej. Estudiar japonés 30 min" />
-          <button id="addHabitBtn" class="btn btn-primary">Crear Hábito</button>
+          <button id="addHabitBtn" class="btn btn-primary">Agregar Hábito</button>
         </div>
         <div id="habitGrid" class="habit-grid"></div>
       </div>
     </section>
 
-    <!-- SECCIÓN 4: ORGANIZADOR MULTI-CUENTA DE CORREO -->
+    <!-- 4. CORREOS MULTI-CUENTA (CON DETECCIÓN OFFLINE) -->
     <section id="view-mail" class="view-section">
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Bandeja Multi-Cuenta y Filtro Antispam</h2>
-          <span class="badge">Sin ruido</span>
+          <h2 class="card-title">Organizador de Correos y Filtro Antispam</h2>
+          <span class="badge" id="mailNetBadge">En línea</span>
+        </div>
+        <div class="offline-banner" id="mailOfflineBanner">
+          Sin conexión a internet: mostrando correos guardados en caché local. La sincronización en vivo con cuentas personales e institucionales se reanudará al volver la red.
         </div>
         <div class="form-row">
           <input type="email" id="mailAccount" placeholder="Cuenta (ej. alumno@uteq.edu.mx)" />
@@ -110,12 +122,12 @@
           <select id="mailCategory">
             <option value="Importante">Importante</option>
             <option value="Universidad">Universidad</option>
-            <option value="Spam">Spam / Promoción</option>
+            <option value="Spam">Spam / Ruido</option>
           </select>
-          <button id="addMailBtn" class="btn btn-primary">Clasificar</button>
+          <button id="addMailBtn" class="btn btn-primary">Guardar</button>
         </div>
         <div style="margin-bottom: 12px;">
-          <label style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+          <label style="font-size: 0.84rem; color: var(--text-secondary); cursor: pointer;">
             <input type="checkbox" id="hideSpamCheck" checked /> Ocultar correos marcados como Spam
           </label>
         </div>
@@ -123,35 +135,39 @@
       </div>
     </section>
 
-    <!-- SECCIÓN 5: WIDGET DE FONDO, APK Y PRIVACIDAD -->
+    <!-- 5. PERMISOS, WIDGET DE INICIO, APK Y PRIVACIDAD -->
     <section id="view-settings" class="view-section">
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Widget Minimalista de Pantalla</h2>
-          <span class="badge">Vista Previa</span>
+          <h2 class="card-title">Widget de Pantalla de Inicio (Android)</h2>
+          <span class="badge">Nativo</span>
         </div>
-        <div class="widget-preview" id="widgetBox">
-          <div style="font-size: 0.8rem; color: #93c5fd; font-weight: 600;">BRISAPLAN • RESUMEN DE HOY</div>
-          <div id="widgetSummary" style="font-size: 0.95rem; line-height: 1.5;">Sin pendientes urgentes.</div>
-        </div>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: 12px;">
+          BrisaPlan incluye un widget nativo sincronizado automáticamente con tus tareas y hábitos. Para ponerlo en tu celular:
+        </p>
+        <ol style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6; padding-left: 18px; margin-bottom: 14px;">
+          <li>Mantén presionado un espacio vacío en la pantalla de inicio de tu teléfono.</li>
+          <li>Toca <strong>Widgets</strong> y busca <strong>BrisaPlan Hoy</strong>.</li>
+          <li>Arrástralo a tu pantalla y redimensiónalo a tu gusto.</li>
+        </ol>
+        <button id="forceWidgetSyncBtn" class="btn btn-primary">Actualizar datos del Widget ahora</button>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Aplicación Android y Soporte</h2>
-          <span class="badge">v8.0</span>
+          <h2 class="card-title">Permisos, Notificaciones y Descarga</h2>
+          <span class="badge">v9.0</span>
         </div>
-        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
-          Descarga el paquete oficial compilado directamente desde GitHub Releases para instalar BrisaPlan en tu dispositivo Android.
-        </p>
         <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-          <a href="https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk" class="btn btn-primary" target="_blank" rel="noopener">
+          <button id="openPermsBtn" class="btn btn-primary">Configurar Permisos y Alertas</button>
+          <button id="testNotifBtn" class="btn">Probar Notificación (5s)</button>
+          <a href="https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk" class="btn" target="_blank" rel="noopener">
             Descargar BrisaPlan.apk
           </a>
           <a href="https://paypal.me/jmatat8" class="btn" target="_blank" rel="noopener">
-            Apoyar proyecto (PayPal)
+            Apoyar (PayPal)
           </a>
-          <button id="openArcoBtn" class="btn">Derechos ARCO y Privacidad</button>
+          <button id="openArcoBtn" class="btn">Privacidad y Derechos ARCO</button>
         </div>
       </div>
     </section>
@@ -159,31 +175,87 @@
 
   <nav class="bottom-nav">
     <button class="nav-btn active" data-target="view-agenda">Agenda</button>
-    <button class="nav-btn" data-target="view-tasks">Tareas</button>
+    <button class="nav-btn" data-target="view-tasks">Entregas</button>
     <button class="nav-btn" data-target="view-habits">Hábitos</button>
     <button class="nav-btn" data-target="view-mail">Correos</button>
-    <button class="nav-btn" data-target="view-settings">App / Más</button>
+    <button class="nav-btn" data-target="view-settings">Ajustes</button>
   </nav>
 
-  <!-- MODAL DERECHOS ARCO -->
-  <div class="modal-backdrop" id="arcoModal">
-    <div class="modal-card">
+  <!-- SHEET PROFESIONAL DE CUENTA / CIERRE DE SESIÓN -->
+  <div class="modal-backdrop" id="accountModal">
+    <div class="sheet-card">
       <div class="card-header">
-        <h3 class="card-title">Aviso de Privacidad y Derechos ARCO</h3>
-        <button id="closeArcoBtn" class="btn">Cerrar</button>
+        <h3 class="card-title">Cuenta y Sincronización</h3>
+        <button id="closeAccountBtn" class="btn">Cerrar</button>
       </div>
-      <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
-        BrisaPlan almacena tus agendas, hábitos y tareas de forma local en tu navegador y, si decides iniciar sesión con Google, sincroniza tus datos de forma cifrada mediante Firebase Cloud Firestore exclusivamente para tu uso personal.
-      </p>
-      <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
-        En cumplimiento con los derechos de <strong>Acceso, Rectificación, Cancelación y Oposición (ARCO)</strong>, puedes exportar o eliminar por completo toda tu información almacenada en este dispositivo en cualquier momento.
-      </p>
-      <div style="display: flex; gap: 10px;">
-        <button id="exportDataBtn" class="btn btn-primary">Exportar mis datos (JSON)</button>
-        <button id="wipeDataBtn" class="btn" style="color: #f87171;">Eliminar todos mis datos</button>
+      <div id="loggedOutView">
+        <p style="font-size: 0.88rem; color: #94a3b8; line-height: 1.55; margin-bottom: 16px;">
+          Conecta tu cuenta personal de Google o tu correo institucional (ej. <strong>@uteq.edu.mx</strong>) para respaldar tu agenda, tareas y rachas en la nube sin perder el acceso sin internet.
+        </p>
+        <button id="googleSignInBtn" class="btn btn-primary" style="width: 100%; padding: 12px;">
+          Continuar con Google (Nativo)
+        </button>
+      </div>
+      <div id="loggedInView" style="display: none;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #141419; border-radius: 16px; margin-bottom: 16px;">
+          <div class="avatar-circle" id="sheetAvatar" style="width: 44px; height: 44px; font-size: 1.1rem;">U</div>
+          <div>
+            <div id="sheetUserName" style="font-weight: 600; font-size: 0.95rem;">Usuario</div>
+            <div id="sheetUserEmail" style="font-size: 0.8rem; color: #94a3b8;">correo@ejemplo.com</div>
+          </div>
+        </div>
+        <button id="googleSignOutBtn" class="btn btn-danger" style="width: 100%; padding: 12px;">
+          Cerrar sesión de forma segura
+        </button>
       </div>
     </div>
   </div>
+
+  <!-- ONBOARDING DE PERMISOS PROFESIONAL -->
+  <div class="modal-backdrop" id="permsModal">
+    <div class="sheet-card">
+      <div class="card-header">
+        <h3 class="card-title">Permisos de BrisaPlan</h3>
+        <button id="closePermsBtn" class="btn">Listo</button>
+      </div>
+      <p style="font-size: 0.86rem; color: #94a3b8; line-height: 1.5; margin-bottom: 14px;">
+        Para avisarte a tiempo antes de tus entregas y mantener tus widgets al día, activa los permisos del sistema:
+      </p>
+      <div class="perm-row">
+        <div>
+          <div style="font-weight: 600; font-size: 0.9rem;">Notificaciones y Recordatorios</div>
+          <div style="font-size: 0.78rem; color: #94a3b8;">Alertas escalonadas según prioridad (Alta, Media, Baja).</div>
+        </div>
+        <button id="reqNotifPermBtn" class="btn btn-primary">Activar</button>
+      </div>
+      <div class="perm-row">
+        <div>
+          <div style="font-weight: 600; font-size: 0.9rem;">Almacenamiento Offline y Widget</div>
+          <div style="font-size: 0.78rem; color: #94a3b8;">Guarda cambios sin internet y actualiza el widget de inicio.</div>
+        </div>
+        <span class="badge">Activo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DERECHOS ARCO -->
+  <div class="modal-backdrop" id="arcoModal">
+    <div class="sheet-card">
+      <div class="card-header">
+        <h3 class="card-title">Privacidad y Derechos ARCO</h3>
+        <button id="closeArcoBtn" class="btn">Cerrar</button>
+      </div>
+      <p style="font-size: 0.86rem; color: #94a3b8; line-height: 1.55; margin-bottom: 14px;">
+        Tus datos se guardan localmente primero y se sincronizan de forma privada con Firebase Firestore solo si inicias sesión. Puedes exportar o borrar toda tu información cuando quieras.
+      </p>
+      <div style="display: flex; gap: 10px;">
+        <button id="exportDataBtn" class="btn btn-primary">Exportar JSON</button>
+        <button id="wipeDataBtn" class="btn btn-danger">Borrar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Guardado</div>
 
   <script type="module" src="app.js"></script>
 </body>

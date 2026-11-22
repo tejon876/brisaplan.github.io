@@ -1,13 +1,11 @@
-# BrisaPlan v8
+# BrisaPlan v9 (Nativo Android + PWA Offline-First)
 
-Organizador personal minimalista (PWA + Android APK vía GitHub Actions y Capacitor).
+## Huella Digital SHA-1 Fija (Registrar en Firebase)
+Si regeneras el paquete, verifica que esta huella coincida en Firebase Console > Configuración del proyecto > Tus apps > `com.brisaplan.app`:
 
-## Estructura del Proyecto
-- `www/`: Código fuente web (HTML5, CSS3, JS modular, Service Worker y Manifest).
-- `.github/workflows/build-apk.yml`: Flujo automático de GitHub Actions que compila el APK con Capacitor y Gradle y lo publica en GitHub Releases (`v8.0.x`).
-- `capacitor.config.json` & `package.json`: Configuración nativa para Android (`io.github.tejon876.brisaplan`).
+`SHA1: F4:DD:E2:45:96:7C:7B:E4:53:D1:42:90:58:65:23:EC:CA:8D:07:54`
 
-## Despliegue rápido en GitHub
-1. Sube el contenido de esta carpeta a tu repositorio `tejon876/brisaplan.github.io`.
-2. Ve a la pestaña **Actions** en GitHub y verifica que **Build BrisaPlan Android APK** se ejecute correctamente.
-3. Descarga el archivo `BrisaPlan.apk` desde la sección **Releases** o directamente desde el botón integrado en la aplicación.
+## Contenido del ZIP
+1. `www/`: Aplicación web y PWA offline-first (`index.html`, `styles.css`, `app.js`, `manifest.json`, `sw.js`).
+2. `native-android/`: Proveedor nativo en Kotlin (`BrisaPlanWidgetProvider.kt`), layouts XML para el widget de pantalla de inicio (`BrisaPlan Hoy`), script de inyección de permisos (`inject_native.py`) y `brisaplan-debug.keystore`.
+3. `.github/workflows/build-apk.yml`: Flujo automático para compilar `BrisaPlan.apk` y publicarlo en Releases.
