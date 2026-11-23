@@ -1318,7 +1318,7 @@ function setupEvents() {
         const redirectUri = getOAuthRedirectUri();
         const authUrl =
           `https://accounts.google.com/o/oauth2/v2/auth` +
-          `?client_id=${encodeURIComponent(GOOGLE_OAUTH_CONFIG?.clientId || "1015496019382-aneel8ga9orksq1uvv1ot1d1fmg61c67.apps.googleusercontent.com")}` +
+          `?client_id=${encodeURIComponent(GOOGLE_OAUTH_CONFIG?.clientId || "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com")}` +
           `&redirect_uri=${encodeURIComponent(redirectUri)}` +
           `&response_type=token%20id_token` +
           `&scope=${encodeURIComponent("openid email profile")}` +
