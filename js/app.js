@@ -637,6 +637,7 @@ async function saveCloudVault() {
 
   saveLocalEncryptedVault(currentUser.uid, encrypted, true);
   scheduleAndroidNativeReminders();
+  syncAndroidHomeWidgets();
 
   if (!navigator.onLine) {
     updateSyncBadgeUI('offline-pending');
@@ -696,6 +697,7 @@ async function enterMainApp({ showWelcome = false } = {}) {
   await renderAll(false);
   checkScheduledNotifications();
   scheduleAndroidNativeReminders();
+  syncAndroidHomeWidgets();
 
   if (!state.tutorialSeen) {
     setTimeout(() => openTutorial(), 450);
@@ -765,6 +767,109 @@ async function handleUserAuthenticated(user) {
     toast('Error al conectar con la nube. Revisa tu conexión.');
   } finally {
     isUnlocking = false;
+  }
+}
+
+
+async function requestInitialAppPermissions() {
+  try {
+    const askedKey = 'brisaplan_initial_perms_asked_v1';
+    if (localStorage.getItem(askedKey) === '1') return;
+    localStorage.setItem(askedKey, '1');
+
+    if (isCapacitorNativeApp()) {
+      const localNotifs = window.Capacitor?.Plugins?.LocalNotifications;
+      if (localNotifs && typeof localNotifs.requestPermissions === 'function') {
+        const perm = await localNotifs.requestPermissions().catch(() => null);
+        if (perm && perm.display === 'granted') {
+          state.notificationsEnabled = true;
+          updateNotificationsButtonUI();
+          await scheduleAndroidNativeReminders();
+        }
+      }
+      return;
+    }
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      const res = await Notification.requestPermission().catch(() => 'default');
+      if (res === 'granted') {
+        state.notificationsEnabled = true;
+        updateNotificationsButtonUI();
+      }
+    }
+  } catch (e) {
+    console.warn('Solicitud inicial de permisos:', e);
+  }
+}
+
+async function syncAndroidHomeWidgets() {
+  if (!isCapacitorNativeApp()) return;
+  try {
+    const prefs = window.Capacitor?.Plugins?.Preferences;
+    const bridge = window.Capacitor?.Plugins?.BrisaWidgetBridge;
+    const today = todayISO();
+
+    const pendingTasks = (state.tasks || []).filter((t) => !t.done);
+    const hoyTitle = pendingTasks.length === 0
+      ? `Todo al día · ${(state.habits || []).length} hábitos`
+      : `${pendingTasks.length} entrega${pendingTasks.length > 1 ? 's' : ''} pendiente${pendingTasks.length > 1 ? 's' : ''}`;
+    const hoySub = pendingTasks.length > 0
+      ? `Próxima: ${pendingTasks[0].title}${pendingTasks[0].dueTime ? ' (' + pendingTasks[0].dueTime + ')' : ''}`
+      : 'Sin entregas atrasadas hoy';
+
+    const todayBlocks = (state.agenda || []).filter((a) => isAgendaItemActiveOnDate(a, today));
+    const agLine1 = todayBlocks.length > 0
+      ? `${todayBlocks[0].time} · ${todayBlocks[0].title}`
+      : 'Sin bloques programados hoy';
+    const agLine2 = todayBlocks.length > 1
+      ? `+${todayBlocks.length - 1} bloque(s) más en tu agenda`
+      : 'Toca para abrir tu horario';
+
+    const doneHabits = (state.habits || []).filter((h) => isHabitDoneToday(h)).length;
+    const maxStreak = (state.habits || []).reduce((mx, h) => Math.max(mx, h.streak || 0), 0);
+    const habTitle = `Racha máxima: ${maxStreak} día${maxStreak === 1 ? '' : 's'}`;
+    const habSub = `Hoy: ${doneHabits}/${(state.habits || []).length} hábitos completados`;
+
+    if (prefs && typeof prefs.set === 'function') {
+      await Promise.all([
+        prefs.set({ key: 'bp_w_hoy_title', value: hoyTitle }),
+        prefs.set({ key: 'bp_w_hoy_sub', value: hoySub }),
+        prefs.set({ key: 'bp_w_agenda_1', value: agLine1 }),
+        prefs.set({ key: 'bp_w_agenda_2', value: agLine2 }),
+        prefs.set({ key: 'bp_w_habit_title', value: habTitle }),
+        prefs.set({ key: 'bp_w_habit_sub', value: habSub }),
+        prefs.set({ key: 'brisaplan_widget_summary', value: `${hoyTitle} · ${agLine1}` })
+      ]);
+    }
+
+    if (bridge && typeof bridge.refreshAll === 'function') {
+      await bridge.refreshAll().catch(() => {});
+    }
+  } catch (e) {
+    console.warn('Sync widgets Android:', e);
+  }
+}
+
+async function pinAndroidHomeWidget(type = 'hoy') {
+  if (!isCapacitorNativeApp()) {
+    toast('Los widgets nativos de pantalla de inicio están disponibles en la app APK de Android.');
+    return;
+  }
+  try {
+    await syncAndroidHomeWidgets();
+    const bridge = window.Capacitor?.Plugins?.BrisaWidgetBridge;
+    if (!bridge || typeof bridge.pinWidget !== 'function') {
+      toast('Mantén presionada la pantalla de inicio de tu celular → Widgets → BrisaPlan.');
+      return;
+    }
+    const res = await bridge.pinWidget({ type });
+    if (res?.pinned) {
+      toast('Widget listo para añadir a tu pantalla de inicio.');
+    } else {
+      toast('Mantén presionado el fondo de tu pantalla → Widgets → busca BrisaPlan.');
+    }
+  } catch {
+    toast('Mantén presionado el fondo de tu pantalla → Widgets → busca BrisaPlan.');
   }
 }
 
@@ -1444,8 +1549,8 @@ function setupEvents() {
         toast('Permite las ventanas emergentes (popups) en tu navegador o entra con correo y contraseña.');
       } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || msg.includes('12501') || msg.toLowerCase().includes('cancel')) {
         toast('Selector de Google cerrado antes de iniciar sesión.');
-      } else if (msg.includes('10:') || msg.toLowerCase().includes('developer_error')) {
-        toast('Verifica la huella SHA-1 del paquete com.brisaplan.app en Firebase Console.');
+      } else if (msg.includes('10:') || msg.toLowerCase().includes('developer_error') || msg.trim() === '10') {
+        toast('Error 10 de Google: registra la huella SHA-1 66:59:03:B8:0F:FD:6E:8F:03:F5:29:74:14:F5:5F:1B:AF:48:55:E2 en Firebase Console → com.brisaplan.app.');
       } else {
         toast(`No se pudo iniciar con Google: ${code || msg || 'revisa tu conexión'}`);
       }
@@ -1878,6 +1983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (dueDateInput) dueDateInput.value = todayISO();
   updatePomodoroText();
   setupEvents();
+  setTimeout(() => { requestInitialAppPermissions(); }, 650);
   window.__brisaModuleReady = true;
 
   window.addEventListener('online', async () => {
