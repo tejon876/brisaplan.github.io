@@ -41,47 +41,7 @@ jobs:
           npx cap sync android
           mkdir -p android/app/src/main/assets/public
           cp -rf www/* android/app/src/main/assets/public/
-          if [ -f "native-android/brisaplan-debug.keystore" ]; then
-            mkdir -p ~/.android
-            cp native-android/brisaplan-debug.keystore ~/.android/debug.keystore
-            cp native-android/brisaplan-debug.keystore android/app/debug.keystore
-          fi
-          python3 - << 'PYEOF'
-          from pathlib import Path
-
-          strings_path = Path("android/app/src/main/res/values/strings.xml")
-          if strings_path.exists():
-              s_xml = strings_path.read_text(encoding="utf-8")
-              if 'name="server_client_id"' not in s_xml and "</resources>" in s_xml:
-                  s_xml = s_xml.replace("</resources>", '    <string name="server_client_id">1015496019382-aneel8ga9orksq1uvv1ot1d1fmg61c67.apps.googleusercontent.com</string>\n</resources>', 1)
-                  strings_path.write_text(s_xml, encoding="utf-8")
-
-          manifest_path = Path("android/app/src/main/AndroidManifest.xml")
-          if manifest_path.exists():
-              content = manifest_path.read_text(encoding="utf-8")
-              perms = [
-                  '<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />',
-                  '<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />',
-                  '<uses-permission android:name="android.permission.WAKE_LOCK" />'
-              ]
-              for perm in perms:
-                  if perm not in content and "<application" in content:
-                      content = content.replace("<application", f"    {perm}\n    <application", 1)
-              manifest_path.write_text(content, encoding="utf-8")
-          PYEOF
-          if [ -d "android-widget-template/app/src/main" ]; then
-            cp -r android-widget-template/app/src/main/* android/app/src/main/
-          fi
-          cat << 'EOF' >> android/app/build.gradle
-
-          configurations.all {
-              resolutionStrategy {
-                  force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-                  force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-              }
-          }
-          EOF
+          python3 native-android/inject_native.py
           cd android && ./gradlew assembleDebug
 
       - name: Rename APK to BrisaPlan.apk
@@ -97,7 +57,7 @@ jobs:
       - name: Publish BrisaPlan.apk to Latest Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v7.8.${{ github.run_number }}
-          name: BrisaPlan v7.8.${{ github.run_number }}
+          tag_name: v7.9.${{ github.run_number }}
+          name: BrisaPlan v7.9.${{ github.run_number }}
           files: BrisaPlan.apk
           make_latest: true
