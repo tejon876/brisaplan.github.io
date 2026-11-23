@@ -113,6 +113,29 @@ function isAndroidDevice() {
   return /Android/i.test(navigator.userAgent || '');
 }
 
+async function ensureAuthPersistenceSafe() {
+  try {
+    await ensureAuthPersistenceSafe();
+  } catch (e) {
+    console.warn('Persistence fallback en WebView:', e?.code || e?.message);
+  }
+}
+
+function initNativeGoogleAuth() {
+  try {
+    const gAuth = window.Capacitor?.Plugins?.GoogleAuth;
+    if (isCapacitorNativeApp() && gAuth && typeof gAuth.initialize === 'function') {
+      gAuth.initialize({
+        clientId: GOOGLE_OAUTH_CONFIG?.clientId || "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com",
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true
+      });
+    }
+  } catch (e) {
+    console.warn('GoogleAuth init:', e);
+  }
+}
+
 function clearAuthErrorFromUrl() {
   try {
     const url = new URL(window.location.href);
@@ -124,7 +147,7 @@ function clearAuthErrorFromUrl() {
 
 function getOAuthRedirectUri() {
   if (isCapacitorNativeApp()) {
-    return "https://tejon876.github.io/brisaplan.github.io/oauth-bridge.html";
+    return "https://tejon876.github.io/oauth-bridge.html";
   }
   try {
     const origin = window.location.origin || '';
@@ -134,7 +157,7 @@ function getOAuthRedirectUri() {
       return `${origin}${cleanPath.endsWith('/') ? cleanPath : cleanPath + '/'}`;
     }
   } catch {}
-  return "https://tejon876.github.io/brisaplan.github.io/";
+  return "https://tejon876.github.io/";
 }
 
 function openExternalAuthFlow(url) {
@@ -176,7 +199,7 @@ async function processOAuthReturnUrl(rawUrl) {
 
     if (idToken || accessToken) {
       toast("Conectando tu cuenta de Google...");
-      await setPersistence(auth, browserLocalPersistence);
+      await ensureAuthPersistenceSafe();
       const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
       const res = await signInWithCredential(auth, credential);
       if (res?.user) {
@@ -1279,11 +1302,18 @@ function setupEvents() {
     btn.disabled = true;
     btn.textContent = mode === 'register' ? 'Creando cuenta...' : 'Iniciando sesión...';
 
+    if (!email || !password) {
+      toast('Escribe tu correo y contraseña.');
+      btn.disabled = false;
+      btn.textContent = mode === 'register' ? 'Crear cuenta y entrar' : 'Entrar a mi cuenta';
+      return;
+    }
+
     try {
-      await setPersistence(auth, browserLocalPersistence);
+      await ensureAuthPersistenceSafe();
       if (mode === 'register') {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        if (name) await updateProfile(cred.user, { displayName: name });
+        if (name) await updateProfile(cred.user, { displayName: name }).catch(() => {});
         currentUser = cred.user;
         await deriveAndEnterWithPassword(cred.user, password, true);
       } else {
@@ -1293,13 +1323,18 @@ function setupEvents() {
       }
       $('#auth-password-input').value = '';
     } catch (err) {
-      const code = err.code || '';
+      console.error('Email auth error:', err);
+      const code = err?.code || '';
       if (code === 'auth/email-already-in-use') {
         toast('Ese correo ya tiene cuenta. Usa "Iniciar sesión" o "Continuar con Google".');
-      } else if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-        toast('Si creaste esta cuenta con Google, entra con Google o pulsa "¿Olvidaste tu contraseña?" para activar acceso por clave.');
+      } else if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        toast('Correo o contraseña incorrectos (si entraste antes con Google, usa Google o "¿Olvidaste tu contraseña?").');
+      } else if (code === 'auth/network-request-failed') {
+        toast('Sin conexión a internet para verificar la cuenta. Conéctate a Wi-Fi o datos.');
+      } else if (code === 'auth/too-many-requests') {
+        toast('Demasiados intentos seguidos. Espera un minuto e intenta de nuevo.');
       } else {
-        toast(`Error de acceso (${code || 'verifica tus datos'})`);
+        toast(`Error de acceso: ${code || err?.message || 'verifica tu conexión'}`);
       }
     } finally {
       btn.disabled = false;
@@ -1314,9 +1349,35 @@ function setupEvents() {
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      await setPersistence(auth, browserLocalPersistence);
+      await ensureAuthPersistenceSafe();
 
       if (isCapacitorNativeApp()) {
+        const gAuth = window.Capacitor?.Plugins?.GoogleAuth;
+        if (gAuth && typeof gAuth.signIn === 'function') {
+          try {
+            initNativeGoogleAuth();
+            const googleUser = await gAuth.signIn();
+            const idToken = googleUser?.authentication?.idToken || googleUser?.idToken;
+            const accessToken = googleUser?.authentication?.accessToken || googleUser?.accessToken;
+            if (idToken || accessToken) {
+              const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
+              const res = await signInWithCredential(auth, credential);
+              if (res?.user) {
+                await handleUserAuthenticated(res.user);
+                return;
+              }
+            }
+          } catch (nativeErr) {
+            console.warn('GoogleAuth nativo falló, intentando flujo web:', nativeErr);
+            const msg = String(nativeErr?.message || nativeErr || '');
+            if (msg.includes('12501') || msg.toLowerCase().includes('cancel')) {
+              toast('Inicio con Google cancelado.');
+              return;
+            }
+          }
+        }
+
+        // Fallback OAuth externo con puente limpio en la raíz de GitHub Pages
         try { localStorage.setItem('brisaplan_native_oauth_pending', '1'); } catch {}
         const redirectUri = getOAuthRedirectUri();
         const authUrl =
@@ -1336,6 +1397,7 @@ function setupEvents() {
       const result = await signInWithPopup(auth, provider);
       await handleUserAuthenticated(result.user);
     } catch (err) {
+      console.error('Google login error:', err);
       const code = err?.code || '';
       if (code === 'auth/popup-blocked') {
         toast('Permite las ventanas emergentes (popups) en tu navegador o entra con correo y contraseña.');
@@ -1345,7 +1407,7 @@ function setupEvents() {
         clearAuthErrorFromUrl();
         toast('El navegador bloqueó el estado de sesión (sessionStorage). Usa correo y contraseña.');
       } else {
-        toast('No se pudo conectar con Google.');
+        toast(`No se pudo conectar con Google (${code || err?.message || 'error'}).`);
       }
     } finally {
       btn.disabled = false;
@@ -1765,6 +1827,7 @@ function setupEvents() {
 document.addEventListener('DOMContentLoaded', async () => {
   await initServiceWorker();
   setupCapacitorAppUrlListener();
+  initNativeGoogleAuth();
   configureTopInstallButton();
   applyTheme(localStorage.getItem('brisaplan_theme_v7') === 'dark');
   const dueDateInput = $('#task-due-date');
@@ -1774,7 +1837,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.__brisaModuleReady = true;
 
   try {
-    await setPersistence(auth, browserLocalPersistence);
+    await ensureAuthPersistenceSafe();
   } catch (err) {
     console.error(err);
   }
