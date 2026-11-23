@@ -809,6 +809,31 @@ async function syncAndroidHomeWidgets() {
     const bridge = window.Capacitor?.Plugins?.BrisaWidgetBridge;
     const today = todayISO();
 
+    // Revisar si el usuario marcó o desmarcó su hábito directamente desde el widget de Android
+    if (prefs && typeof prefs.get === 'function') {
+      const pendingToggle = await prefs.get({ key: 'bp_w_habit_pending_toggle' }).catch(() => ({ value: '' }));
+      const flag = pendingToggle?.value || '';
+      if (flag === today && Array.isArray(state.habits) && state.habits.length > 0) {
+        const nextPendingHabit = state.habits.find((h) => !isHabitDoneToday(h));
+        if (nextPendingHabit) {
+          toggleHabit(state, nextPendingHabit.id);
+          await prefs.remove({ key: 'bp_w_habit_pending_toggle' }).catch(() => {});
+          saveCloudVault().catch(() => {});
+        } else {
+          await prefs.remove({ key: 'bp_w_habit_pending_toggle' }).catch(() => {});
+        }
+      } else if (flag === `UNDO:${today}` && Array.isArray(state.habits) && state.habits.length > 0) {
+        const lastDoneHabit = state.habits.find((h) => isHabitDoneToday(h));
+        if (lastDoneHabit) {
+          toggleHabit(state, lastDoneHabit.id);
+          await prefs.remove({ key: 'bp_w_habit_pending_toggle' }).catch(() => {});
+          saveCloudVault().catch(() => {});
+        } else {
+          await prefs.remove({ key: 'bp_w_habit_pending_toggle' }).catch(() => {});
+        }
+      }
+    }
+
     const pendingTasks = (state.tasks || []).filter((t) => !t.done);
     const hoyTitle = pendingTasks.length === 0
       ? `Todo al día · ${(state.habits || []).length} hábitos`
@@ -816,28 +841,43 @@ async function syncAndroidHomeWidgets() {
     const hoySub = pendingTasks.length > 0
       ? `Próxima: ${pendingTasks[0].title}${pendingTasks[0].dueTime ? ' (' + pendingTasks[0].dueTime + ')' : ''}`
       : 'Sin entregas atrasadas hoy';
+    const hoyColor = pendingTasks.length > 0 ? (pendingTasks[0].color || '#4A93C6') : '#4A93C6';
 
     const todayBlocks = (state.agenda || []).filter((a) => isAgendaItemActiveOnDate(a, today));
     const agLine1 = todayBlocks.length > 0
-      ? `${todayBlocks[0].time} · ${todayBlocks[0].title}`
+      ? `${todayBlocks[0].time}${todayBlocks[0].endTime ? ' - ' + todayBlocks[0].endTime : ''} · ${todayBlocks[0].title}`
       : 'Sin bloques programados hoy';
     const agLine2 = todayBlocks.length > 1
       ? `+${todayBlocks.length - 1} bloque(s) más en tu agenda`
       : 'Toca para abrir tu horario';
+    const agColor = todayBlocks.length > 0 ? (todayBlocks[0].color || '#F59E0B') : '#F59E0B';
 
+    const totalHabits = (state.habits || []).length;
     const doneHabits = (state.habits || []).filter((h) => isHabitDoneToday(h)).length;
+    const allHabitsDone = totalHabits > 0 && doneHabits >= totalHabits;
     const maxStreak = (state.habits || []).reduce((mx, h) => Math.max(mx, h.streak || 0), 0);
-    const habTitle = `Racha máxima: ${maxStreak} día${maxStreak === 1 ? '' : 's'}`;
-    const habSub = `Hoy: ${doneHabits}/${(state.habits || []).length} hábitos completados`;
+    const habTitle = `Racha activa: ${maxStreak} día${maxStreak === 1 ? '' : 's'}`;
+    const habSub = totalHabits > 0
+      ? `Hoy: ${doneHabits}/${totalHabits} hábitos${allHabitsDone ? ' · ¡Completado!' : ''}`
+      : 'Crea un hábito en Tareas';
+    const habColor = allHabitsDone ? '#10B981' : '#38BDF8';
 
     if (prefs && typeof prefs.set === 'function') {
       await Promise.all([
         prefs.set({ key: 'bp_w_hoy_title', value: hoyTitle }),
         prefs.set({ key: 'bp_w_hoy_sub', value: hoySub }),
+        prefs.set({ key: 'bp_w_hoy_color', value: hoyColor }),
         prefs.set({ key: 'bp_w_agenda_1', value: agLine1 }),
         prefs.set({ key: 'bp_w_agenda_2', value: agLine2 }),
+        prefs.set({ key: 'bp_w_agenda_color', value: agColor }),
         prefs.set({ key: 'bp_w_habit_title', value: habTitle }),
         prefs.set({ key: 'bp_w_habit_sub', value: habSub }),
+        prefs.set({ key: 'bp_w_habit_color', value: habColor }),
+        prefs.set({ key: 'bp_w_habit_done', value: allHabitsDone ? '1' : '0' }),
+        prefs.set({ key: 'bp_w_habit_date', value: today }),
+        prefs.set({ key: 'bp_w_habit_done_count', value: String(doneHabits) }),
+        prefs.set({ key: 'bp_w_habit_total', value: String(totalHabits) }),
+        prefs.set({ key: 'bp_w_habit_streak', value: String(maxStreak) }),
         prefs.set({ key: 'brisaplan_widget_summary', value: `${hoyTitle} · ${agLine1}` })
       ]);
     }
@@ -1985,6 +2025,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEvents();
   setTimeout(() => { requestInitialAppPermissions(); }, 650);
   window.__brisaModuleReady = true;
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && currentUser && vaultSecret) {
+      syncAndroidHomeWidgets();
+    }
+  });
 
   window.addEventListener('online', async () => {
     updateSyncBadgeUI('offline-pending');

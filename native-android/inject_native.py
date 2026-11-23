@@ -105,7 +105,10 @@ receivers = '''
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_agenda" />
         </receiver>
         <receiver android:name=".BrisaPlanWidgetHabits" android:exported="true" android:label="BrisaPlan Rachas">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.brisaplan.app.ACTION_TOGGLE_HABIT" />
+            </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_habits" />
         </receiver>
 '''

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brisaplan-v7.9';
+const CACHE_NAME = 'brisaplan-v7.11';
 const CORE_ASSETS = [
   './',
   './index.html',
