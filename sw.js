@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brisaplan-v7.5';
+const CACHE_NAME = 'brisaplan-v7.8';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './js/storage.js',
   './js/crypto.js',
   './js/firebase-config.js',
+  './js/firebase-bridge.js',
   './js/legal.js'
 ];
 

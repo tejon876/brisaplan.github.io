@@ -1,24 +1,17 @@
 window.addEventListener('unhandledrejection', (ev) => {
   console.error('BrisaPlan async error:', ev.reason);
 });
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-  getAuth,
-  GoogleAuthProvider,
-  EmailAuthProvider,
-  linkWithCredential,
-  signInWithCredential,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  updateProfile,
-  signOut,
-  onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  getStoredRestSession,
+  clearRestSession,
+  refreshRestIdToken,
+  restSignInWithPassword,
+  restSignUpWithPassword,
+  restSignInWithGoogleIdToken,
+  restSendPasswordReset,
+  restFirestoreGetDoc,
+  restFirestoreSetDoc
+} from "./firebase-bridge.js";
 import { firebaseConfig, GOOGLE_OAUTH_CONFIG } from "./firebase-config.js";
 import { todayISO, todayWeekday, createCleanState } from "./storage.js";
 import { generateSaltB64, hashPasswordPBKDF2, encryptVaultData, decryptVaultData } from "./crypto.js";
@@ -53,9 +46,24 @@ import {
   removeMessage
 } from "./mail-classroom.js";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let app = null;
+let auth = null;
+let db = null;
+let sdkModules = null;
+
+async function ensureWebFirebaseSDK() {
+  if (sdkModules) return sdkModules;
+  const [appMod, authMod, fsMod] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"),
+    import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js")
+  ]);
+  app = appMod.initializeApp(firebaseConfig);
+  auth = authMod.getAuth(app);
+  db = fsMod.getFirestore(app);
+  sdkModules = { ...appMod, ...authMod, ...fsMod };
+  return sdkModules;
+}
 
 let currentUser = null;
 let vaultSecret = null;
@@ -114,10 +122,12 @@ function isAndroidDevice() {
 }
 
 async function ensureAuthPersistenceSafe() {
+  if (isCapacitorNativeApp()) return;
   try {
-    await ensureAuthPersistenceSafe();
+    const sdk = await ensureWebFirebaseSDK();
+    await sdk.setPersistence(auth, sdk.browserLocalPersistence);
   } catch (e) {
-    console.warn('Persistence fallback en WebView:', e?.code || e?.message);
+    console.warn('Persistence fallback:', e?.code || e?.message);
   }
 }
 
@@ -397,14 +407,24 @@ function showLoginStep(step) {
 }
 
 async function checkUserVaultMeta(uid) {
-  const metaRef = doc(db, 'users', uid, 'meta', 'vault');
-  const snap = await getDoc(metaRef);
+  if (isCapacitorNativeApp() || getStoredRestSession()) {
+    return await restFirestoreGetDoc(`users/${uid}/meta/vault`);
+  }
+  const sdk = await ensureWebFirebaseSDK();
+  const metaRef = sdk.doc(db, 'users', uid, 'meta', 'vault');
+  const snap = await sdk.getDoc(metaRef);
   return snap.exists() ? snap.data() : null;
 }
 
 async function saveUserVaultMeta(uid, salt) {
-  const metaRef = doc(db, 'users', uid, 'meta', 'vault');
-  await setDoc(metaRef, { salt, hasMaster: true, updatedAt: new Date().toISOString() });
+  const payload = { salt, hasMaster: true, updatedAt: new Date().toISOString() };
+  if (isCapacitorNativeApp() || getStoredRestSession()) {
+    await restFirestoreSetDoc(`users/${uid}/meta/vault`, payload);
+    return;
+  }
+  const sdk = await ensureWebFirebaseSDK();
+  const metaRef = sdk.doc(db, 'users', uid, 'meta', 'vault');
+  await sdk.setDoc(metaRef, payload);
 }
 
 /* ==================== MODO OFFLINE LOCAL-FIRST Y SINCRONIZACIÓN ==================== */
@@ -475,8 +495,13 @@ async function flushPendingOfflineSync() {
     return;
   }
   try {
-    const vaultRef = doc(db, 'users', currentUser.uid, 'vault', 'data');
-    await setDoc(vaultRef, cached.payload);
+    if (isCapacitorNativeApp() || getStoredRestSession()) {
+      await restFirestoreSetDoc(`users/${currentUser.uid}/vault/data`, cached.payload);
+    } else {
+      const sdk = await ensureWebFirebaseSDK();
+      const vaultRef = sdk.doc(db, 'users', currentUser.uid, 'vault', 'data');
+      await sdk.setDoc(vaultRef, cached.payload);
+    }
     saveLocalEncryptedVault(currentUser.uid, cached.payload, false);
     updateSyncBadgeUI('synced');
     toast('Conexión recuperada: cambios sincronizados con la nube.');
@@ -578,16 +603,22 @@ async function loadCloudVault(uid, secret, salt) {
   }
 
   try {
-    const vaultRef = doc(db, 'users', uid, 'vault', 'data');
-    const snap = await getDoc(vaultRef);
-    if (!snap.exists()) {
+    let encrypted = null;
+    if (isCapacitorNativeApp() || getStoredRestSession()) {
+      encrypted = await restFirestoreGetDoc(`users/${uid}/vault/data`);
+    } else {
+      const sdk = await ensureWebFirebaseSDK();
+      const vaultRef = sdk.doc(db, 'users', uid, 'vault', 'data');
+      const snap = await sdk.getDoc(vaultRef);
+      encrypted = snap.exists() ? snap.data() : null;
+    }
+    if (!encrypted) {
       if (localCache && localCache.payload) {
         const decryptedLocal = await decryptVaultData(localCache.payload, secret, salt);
         return { ...createCleanState(), ...decryptedLocal };
       }
       return createCleanState();
     }
-    const encrypted = snap.data();
     saveLocalEncryptedVault(uid, encrypted, false);
     const decrypted = await decryptVaultData(encrypted, secret, salt);
     return { ...createCleanState(), ...decrypted };
@@ -613,8 +644,13 @@ async function saveCloudVault() {
   }
 
   try {
-    const vaultRef = doc(db, 'users', currentUser.uid, 'vault', 'data');
-    await setDoc(vaultRef, encrypted);
+    if (isCapacitorNativeApp() || getStoredRestSession()) {
+      await restFirestoreSetDoc(`users/${currentUser.uid}/vault/data`, encrypted);
+    } else {
+      const sdk = await ensureWebFirebaseSDK();
+      const vaultRef = sdk.doc(db, 'users', currentUser.uid, 'vault', 'data');
+      await sdk.setDoc(vaultRef, encrypted);
+    }
     saveLocalEncryptedVault(currentUser.uid, encrypted, false);
     updateSyncBadgeUI('synced');
   } catch {
@@ -623,16 +659,17 @@ async function saveCloudVault() {
 }
 
 async function tryLinkEmailPasswordToCurrentUser(rawPassword) {
+  if (isCapacitorNativeApp()) return;
   try {
-    const user = auth.currentUser;
+    const sdk = await ensureWebFirebaseSDK();
+    const user = auth?.currentUser;
     if (!user || !user.email || !rawPassword || rawPassword.length < 6) return;
     const hasPasswordProvider = (user.providerData || []).some((p) => p.providerId === 'password');
     if (hasPasswordProvider) return;
-    const cred = EmailAuthProvider.credential(user.email, rawPassword);
-    await linkWithCredential(user, cred);
+    const cred = sdk.EmailAuthProvider.credential(user.email, rawPassword);
+    await sdk.linkWithCredential(user, cred);
     toast('Tu contraseña también quedó vinculada para iniciar sesión directa con correo.');
   } catch (err) {
-    // Si ya estaba vinculada o requiere reautenticación reciente, ignorar silenciosamente
     console.warn('Vinculación correo/contraseña omitida:', err?.code || err);
   }
 }
@@ -1286,7 +1323,12 @@ function setupEvents() {
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email);
+      if (isCapacitorNativeApp()) {
+        await restSendPasswordReset(email);
+      } else {
+        const sdk = await ensureWebFirebaseSDK();
+        await sdk.sendPasswordResetEmail(auth, email);
+      }
       toast(`Correo de recuperación enviado a ${email}. Revisa tu bandeja o spam.`);
     } catch (err) {
       toast('No se pudo enviar el correo. Verifica que la dirección esté registrada.');
@@ -1312,16 +1354,31 @@ function setupEvents() {
     }
 
     try {
-      await ensureAuthPersistenceSafe();
-      if (mode === 'register') {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        if (name) await updateProfile(cred.user, { displayName: name }).catch(() => {});
-        currentUser = cred.user;
-        await deriveAndEnterWithPassword(cred.user, password, true);
+      if (isCapacitorNativeApp()) {
+        const session = mode === 'register'
+          ? await restSignUpWithPassword(email, password, name)
+          : await restSignInWithPassword(email, password);
+        const userObj = {
+          uid: session.uid,
+          email: session.email,
+          displayName: session.displayName || name || '',
+          photoURL: session.photoURL || ''
+        };
+        currentUser = userObj;
+        await deriveAndEnterWithPassword(userObj, password, mode === 'register');
       } else {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        currentUser = cred.user;
-        await deriveAndEnterWithPassword(cred.user, password, false);
+        await ensureAuthPersistenceSafe();
+        const sdk = await ensureWebFirebaseSDK();
+        if (mode === 'register') {
+          const cred = await sdk.createUserWithEmailAndPassword(auth, email, password);
+          if (name) await sdk.updateProfile(cred.user, { displayName: name }).catch(() => {});
+          currentUser = cred.user;
+          await deriveAndEnterWithPassword(cred.user, password, true);
+        } else {
+          const cred = await sdk.signInWithEmailAndPassword(auth, email, password);
+          currentUser = cred.user;
+          await deriveAndEnterWithPassword(cred.user, password, false);
+        }
       }
       $('#auth-password-input').value = '';
     } catch (err) {
@@ -1347,12 +1404,8 @@ function setupEvents() {
   $('#btn-google-login').addEventListener('click', async () => {
     const btn = $('#btn-google-login');
     btn.disabled = true;
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      await ensureAuthPersistenceSafe();
-
       if (isCapacitorNativeApp()) {
         const gAuth = window.Capacitor?.Plugins?.GoogleAuth;
         if (!gAuth || typeof gAuth.signIn !== 'function') {
@@ -1364,17 +1417,24 @@ function setupEvents() {
         const googleUser = await gAuth.signIn();
         const idToken = googleUser?.authentication?.idToken || googleUser?.idToken;
         if (!idToken) {
-          throw new Error('No se recibió el token de autenticación de Google.');
+          throw new Error('No se recibió el token de Google.');
         }
-        const credential = GoogleAuthProvider.credential(idToken);
-        const res = await signInWithCredential(auth, credential);
-        if (res?.user) {
-          await handleUserAuthenticated(res.user);
-        }
+        const session = await restSignInWithGoogleIdToken(idToken);
+        const userObj = {
+          uid: session.uid,
+          email: session.email || googleUser?.email || '',
+          displayName: session.displayName || googleUser?.name || '',
+          photoURL: session.photoURL || googleUser?.imageUrl || ''
+        };
+        await handleUserAuthenticated(userObj);
         return;
       }
 
-      const result = await signInWithPopup(auth, provider);
+      await ensureAuthPersistenceSafe();
+      const sdk = await ensureWebFirebaseSDK();
+      const provider = new sdk.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await sdk.signInWithPopup(auth, provider);
       await handleUserAuthenticated(result.user);
     } catch (err) {
       console.error('Google login error:', err);
@@ -1397,7 +1457,8 @@ function setupEvents() {
   $('#btn-switch-google').addEventListener('click', async () => {
     clearLocalVaultSession(currentUser?.uid);
     if (isCapacitorNativeApp() && window.Capacitor?.Plugins?.GoogleAuth?.signOut) { await window.Capacitor.Plugins.GoogleAuth.signOut().catch(() => {}); }
-    await signOut(auth);
+    clearRestSession();
+    if (!isCapacitorNativeApp() && auth && sdkModules?.signOut) { await sdkModules.signOut(auth).catch(() => {}); }
     currentUser = null;
     vaultSecret = null;
     vaultSalt = null;
@@ -1793,7 +1854,8 @@ function setupEvents() {
     clearLocalVaultSession(currentUser?.uid);
     clearOfflineUserProfile();
     if (isCapacitorNativeApp() && window.Capacitor?.Plugins?.GoogleAuth?.signOut) { await window.Capacitor.Plugins.GoogleAuth.signOut().catch(() => {}); }
-    await signOut(auth);
+    clearRestSession();
+    if (!isCapacitorNativeApp() && auth && sdkModules?.signOut) { await sdkModules.signOut(auth).catch(() => {}); }
     currentUser = null;
     vaultSecret = null;
     vaultSalt = null;
@@ -1818,12 +1880,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEvents();
   window.__brisaModuleReady = true;
 
-  try {
-    await ensureAuthPersistenceSafe();
-  } catch (err) {
-    console.error(err);
-  }
-
   window.addEventListener('online', async () => {
     updateSyncBadgeUI('offline-pending');
     await flushPendingOfflineSync();
@@ -1838,6 +1894,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkScheduledNotifications();
   }, 20000);
 
+  if (isCapacitorNativeApp()) {
+    const restSession = getStoredRestSession();
+    const offlineUser = getOfflineUserProfile();
+    const candidate = restSession?.uid
+      ? {
+          uid: restSession.uid,
+          email: restSession.email || offlineUser?.email || '',
+          displayName: restSession.displayName || offlineUser?.displayName || '',
+          photoURL: restSession.photoURL || offlineUser?.photoURL || ''
+        }
+      : offlineUser;
+
+    if (candidate && candidate.uid && getLocalVaultSession(candidate.uid)) {
+      if (navigator.onLine && restSession) {
+        refreshRestIdToken(restSession).catch(() => {});
+      }
+      await handleUserAuthenticated(candidate);
+    } else {
+      currentUser = null;
+      document.body.classList.add('auth-locked');
+      $('#login-gate').style.display = 'flex';
+      $('#app-shell').style.display = 'none';
+      showLoginStep('auth');
+    }
+    return;
+  }
+
   if (!navigator.onLine) {
     const offlineUser = getOfflineUserProfile();
     if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {
@@ -1845,24 +1928,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  onAuthStateChanged(auth, async (user) => {
-    if (user && !vaultSecret) {
-      await handleUserAuthenticated(user);
-    } else if (!user && !isUnlocking) {
-      if (!navigator.onLine) {
-        const offlineUser = getOfflineUserProfile();
-        if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {
-          if (!vaultSecret) await handleUserAuthenticated(offlineUser);
-          return;
+  try {
+    const sdk = await ensureWebFirebaseSDK();
+    await ensureAuthPersistenceSafe();
+    sdk.onAuthStateChanged(auth, async (user) => {
+      if (user && !vaultSecret) {
+        await handleUserAuthenticated(user);
+      } else if (!user && !isUnlocking) {
+        if (!navigator.onLine) {
+          const offlineUser = getOfflineUserProfile();
+          if (offlineUser && offlineUser.uid && getLocalVaultSession(offlineUser.uid)) {
+            if (!vaultSecret) await handleUserAuthenticated(offlineUser);
+            return;
+          }
         }
+        currentUser = null;
+        document.body.classList.add('auth-locked');
+        $('#login-gate').style.display = 'flex';
+        $('#app-shell').style.display = 'none';
+        showLoginStep('auth');
       }
-      currentUser = null;
-      document.body.classList.add('auth-locked');
-      $('#login-gate').style.display = 'flex';
-      $('#app-shell').style.display = 'none';
-      showLoginStep('auth');
-    }
-  });
+    });
+  } catch (err) {
+    console.error('Error iniciando Firebase Web SDK:', err);
+  }
 });
 
 /* ==========================================================================
