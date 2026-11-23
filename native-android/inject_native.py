@@ -38,7 +38,7 @@ configurations.all {
 with open(gradle_path, "w", encoding="utf-8") as f:
     f.write(gradle)
 
-# 3. Copy Kotlin Widget Providers, Bridge Plugin & XML layouts/drawables
+# 3. Copy Java Widget Providers, Bridge Plugin & XML layouts/drawables
 pkg_dir = "android/app/src/main/java/com/brisaplan/app"
 res_dir = "android/app/src/main/res"
 os.makedirs(pkg_dir, exist_ok=True)
@@ -46,8 +46,8 @@ os.makedirs(f"{res_dir}/layout", exist_ok=True)
 os.makedirs(f"{res_dir}/drawable", exist_ok=True)
 os.makedirs(f"{res_dir}/xml", exist_ok=True)
 
-for kt in ["BrisaPlanWidgetHoy.kt", "BrisaPlanWidgetAgenda.kt", "BrisaPlanWidgetHabits.kt", "BrisaWidgetBridge.kt"]:
-    shutil.copy(f"native-android/{kt}", f"{pkg_dir}/{kt}")
+for jfile in ["BrisaPlanWidgetHoy.java", "BrisaPlanWidgetAgenda.java", "BrisaPlanWidgetHabits.java", "BrisaWidgetBridge.java"]:
+    shutil.copy(f"native-android/{jfile}", f"{pkg_dir}/{jfile}")
 
 shutil.copy("native-android/widget_bg.xml", f"{res_dir}/drawable/widget_bg.xml")
 for lay in ["widget_hoy.xml", "widget_agenda.xml", "widget_habits.xml"]:
@@ -55,26 +55,19 @@ for lay in ["widget_hoy.xml", "widget_agenda.xml", "widget_habits.xml"]:
 for inf in ["widget_info_hoy.xml", "widget_info_agenda.xml", "widget_info_habits.xml"]:
     shutil.copy(f"native-android/{inf}", f"{res_dir}/xml/{inf}")
 
-# 4. Register BrisaWidgetBridge in MainActivity
-main_kt = f"{pkg_dir}/MainActivity.kt"
+# 4. Register BrisaWidgetBridge in MainActivity.java
 main_java = f"{pkg_dir}/MainActivity.java"
-if os.path.exists(main_kt):
-    with open(main_kt, "r", encoding="utf-8") as f:
-        mc = f.read()
-    if "BrisaWidgetBridge" not in mc:
-        mc = mc.replace("super.onCreate(savedInstanceState)", "registerPlugin(BrisaWidgetBridge::class.java)\n        super.onCreate(savedInstanceState)")
-        if "override fun onCreate" not in mc:
-            mc = mc.replace("class MainActivity : BridgeActivity()", "import android.os.Bundle\nclass MainActivity : BridgeActivity() {\n    override fun onCreate(savedInstanceState: Bundle?) {\n        registerPlugin(BrisaWidgetBridge::class.java)\n        super.onCreate(savedInstanceState)\n    }\n}")
-            mc = mc.replace("class MainActivity : BridgeActivity() {}", "")
-        with open(main_kt, "w", encoding="utf-8") as f:
-            f.write(mc)
-elif os.path.exists(main_java):
+if os.path.exists(main_java):
     with open(main_java, "r", encoding="utf-8") as f:
         mj = f.read()
     if "BrisaWidgetBridge" not in mj:
-        mj = mj.replace("super.onCreate(savedInstanceState);", "registerPlugin(BrisaWidgetBridge.class);\n        super.onCreate(savedInstanceState);")
-        if "onCreate(" not in mj:
-            mj = mj.replace("public class MainActivity extends BridgeActivity {}", "import android.os.Bundle;\npublic class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(BrisaWidgetBridge.class);\n        super.onCreate(savedInstanceState);\n    }\n}")
+        if "onCreate(" in mj:
+            mj = mj.replace("super.onCreate(savedInstanceState);", "registerPlugin(BrisaWidgetBridge.class);\n        super.onCreate(savedInstanceState);")
+        else:
+            mj = mj.replace(
+                "public class MainActivity extends BridgeActivity {}",
+                "import android.os.Bundle;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(BrisaWidgetBridge.class);\n        super.onCreate(savedInstanceState);\n    }\n}"
+            )
         with open(main_java, "w", encoding="utf-8") as f:
             f.write(mj)
 
@@ -122,4 +115,4 @@ if "BrisaPlanWidgetHoy" not in manifest:
 with open(manifest_path, "w", encoding="utf-8") as f:
     f.write(manifest)
 
-print("Injected signed keystore, 3 native widgets, BrisaWidgetBridge & permissions.")
+print("Injected signed keystore, 3 Java native widgets, BrisaWidgetBridge & permissions.")
