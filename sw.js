@@ -1,12 +1,12 @@
-const CACHE_NAME = 'brisaplan-v7.4';
+const CACHE_NAME = 'brisaplan-v7.5';
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/variables.css?v=7.4',
-  './css/layout.css?v=7.4',
-  './css/components.css?v=7.4',
-  './js/app.js?v=7.4',
+  './css/variables.css',
+  './css/layout.css',
+  './css/components.css',
+  './js/app.js',
   './js/agenda.js',
   './js/tasks-habits.js',
   './js/mail-classroom.js',

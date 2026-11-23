@@ -1,3 +1,6 @@
+window.addEventListener('unhandledrejection', (ev) => {
+  console.error('BrisaPlan async error:', ev.reason);
+});
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
   getAuth,
@@ -1768,6 +1771,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (dueDateInput) dueDateInput.value = todayISO();
   updatePomodoroText();
   setupEvents();
+  window.__brisaModuleReady = true;
 
   try {
     await setPersistence(auth, browserLocalPersistence);
