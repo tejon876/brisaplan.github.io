@@ -121,15 +121,17 @@ async function ensureAuthPersistenceSafe() {
   }
 }
 
+const NATIVE_GOOGLE_CLIENT_ID = "1015496019382-aneel8ga9orksq1uvv1ot1d1fmg61c67.apps.googleusercontent.com";
+
 function initNativeGoogleAuth() {
   try {
     const gAuth = window.Capacitor?.Plugins?.GoogleAuth;
     if (isCapacitorNativeApp() && gAuth && typeof gAuth.initialize === 'function') {
       gAuth.initialize({
-        clientId: GOOGLE_OAUTH_CONFIG?.clientId || "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com",
+        clientId: NATIVE_GOOGLE_CLIENT_ID,
         scopes: ['profile', 'email'],
         grantOfflineAccess: true
-      });
+      }).catch(() => {});
     }
   } catch (e) {
     console.warn('GoogleAuth init:', e);
@@ -1353,44 +1355,22 @@ function setupEvents() {
 
       if (isCapacitorNativeApp()) {
         const gAuth = window.Capacitor?.Plugins?.GoogleAuth;
-        if (gAuth && typeof gAuth.signIn === 'function') {
-          try {
-            initNativeGoogleAuth();
-            const googleUser = await gAuth.signIn();
-            const idToken = googleUser?.authentication?.idToken || googleUser?.idToken;
-            const accessToken = googleUser?.authentication?.accessToken || googleUser?.accessToken;
-            if (idToken || accessToken) {
-              const credential = GoogleAuthProvider.credential(idToken || null, accessToken || null);
-              const res = await signInWithCredential(auth, credential);
-              if (res?.user) {
-                await handleUserAuthenticated(res.user);
-                return;
-              }
-            }
-          } catch (nativeErr) {
-            console.warn('GoogleAuth nativo falló, intentando flujo web:', nativeErr);
-            const msg = String(nativeErr?.message || nativeErr || '');
-            if (msg.includes('12501') || msg.toLowerCase().includes('cancel')) {
-              toast('Inicio con Google cancelado.');
-              return;
-            }
-          }
+        if (!gAuth || typeof gAuth.signIn !== 'function') {
+          toast('El selector nativo de Google no está disponible en esta compilación.');
+          return;
         }
-
-        // Fallback OAuth externo con puente limpio en la raíz de GitHub Pages
-        try { localStorage.setItem('brisaplan_native_oauth_pending', '1'); } catch {}
-        const redirectUri = getOAuthRedirectUri();
-        const authUrl =
-          `https://accounts.google.com/o/oauth2/v2/auth` +
-          `?client_id=${encodeURIComponent(GOOGLE_OAUTH_CONFIG?.clientId || "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com")}` +
-          `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-          `&response_type=token%20id_token` +
-          `&scope=${encodeURIComponent("openid email profile")}` +
-          `&state=${encodeURIComponent("brisaplan_native")}` +
-          `&prompt=select_account` +
-          `&nonce=${Date.now()}`;
-        await openExternalAuthFlow(authUrl);
-        toast("Elige tu cuenta de Google; volverás automáticamente a BrisaPlan.");
+        toast('Abriendo selector de cuentas de Google...');
+        initNativeGoogleAuth();
+        const googleUser = await gAuth.signIn();
+        const idToken = googleUser?.authentication?.idToken || googleUser?.idToken;
+        if (!idToken) {
+          throw new Error('No se recibió el token de autenticación de Google.');
+        }
+        const credential = GoogleAuthProvider.credential(idToken);
+        const res = await signInWithCredential(auth, credential);
+        if (res?.user) {
+          await handleUserAuthenticated(res.user);
+        }
         return;
       }
 
@@ -1398,16 +1378,16 @@ function setupEvents() {
       await handleUserAuthenticated(result.user);
     } catch (err) {
       console.error('Google login error:', err);
-      const code = err?.code || '';
+      const code = String(err?.code || '');
+      const msg = String(err?.message || err || '');
       if (code === 'auth/popup-blocked') {
         toast('Permite las ventanas emergentes (popups) en tu navegador o entra con correo y contraseña.');
-      } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-        toast('Ventana de Google cerrada antes de iniciar sesión.');
-      } else if (code === 'auth/missing-initial-state' || String(err?.message || '').includes('missing initial state')) {
-        clearAuthErrorFromUrl();
-        toast('El navegador bloqueó el estado de sesión (sessionStorage). Usa correo y contraseña.');
+      } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || msg.includes('12501') || msg.toLowerCase().includes('cancel')) {
+        toast('Selector de Google cerrado antes de iniciar sesión.');
+      } else if (msg.includes('10:') || msg.toLowerCase().includes('developer_error')) {
+        toast('Verifica la huella SHA-1 del paquete com.brisaplan.app en Firebase Console.');
       } else {
-        toast(`No se pudo conectar con Google (${code || err?.message || 'error'}).`);
+        toast(`No se pudo iniciar con Google: ${code || msg || 'revisa tu conexión'}`);
       }
     } finally {
       btn.disabled = false;
@@ -1416,6 +1396,7 @@ function setupEvents() {
 
   $('#btn-switch-google').addEventListener('click', async () => {
     clearLocalVaultSession(currentUser?.uid);
+    if (isCapacitorNativeApp() && window.Capacitor?.Plugins?.GoogleAuth?.signOut) { await window.Capacitor.Plugins.GoogleAuth.signOut().catch(() => {}); }
     await signOut(auth);
     currentUser = null;
     vaultSecret = null;
@@ -1811,6 +1792,7 @@ function setupEvents() {
     if (!confirm('¿Cerrar sesión en este dispositivo?')) return;
     clearLocalVaultSession(currentUser?.uid);
     clearOfflineUserProfile();
+    if (isCapacitorNativeApp() && window.Capacitor?.Plugins?.GoogleAuth?.signOut) { await window.Capacitor.Plugins.GoogleAuth.signOut().catch(() => {}); }
     await signOut(auth);
     currentUser = null;
     vaultSecret = null;
