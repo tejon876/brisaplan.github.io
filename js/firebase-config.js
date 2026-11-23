@@ -10,7 +10,7 @@ export const firebaseConfig = {
 };
 
 export const GOOGLE_OAUTH_CONFIG = {
-  clientId: "45181844063-v8cs61mc291da1vmumc8sq3pjaboc00i.apps.googleusercontent.com",
+  clientId: "1015496019382-aneel8ga9orksq1uvv1ot1d1fmg61c67.apps.googleusercontent.com",
   gmailScope: "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send",
   apkDownloadUrl: "https://github.com/tejon876/brisaplan.github.io/releases/latest/download/BrisaPlan.apk"
 };

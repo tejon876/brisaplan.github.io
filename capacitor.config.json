@@ -2,17 +2,26 @@
   "appId": "com.brisaplan.app",
   "appName": "BrisaPlan",
   "webDir": "www",
-  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
   "plugins": {
+    "App": {
+      "urlSchemes": [
+        "brisaplan"
+      ]
+    },
     "GoogleAuth": {
-      "scopes": ["profile", "email"],
+      "scopes": [
+        "profile",
+        "email"
+      ],
       "serverClientId": "1015496019382-aneel8ga9orksq1uvv1ot1d1fmg61c67.apps.googleusercontent.com",
       "forceCodeForRefreshToken": true
     },
     "LocalNotifications": {
       "smallIcon": "ic_stat_icon_config_sample",
-      "iconColor": "#93C5FD",
-      "sound": "default"
+      "iconColor": "#4A93C6"
     }
   }
 }

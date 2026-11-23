@@ -1,9 +1,24 @@
-# BrisaPlan v10 (Estética Original + Widgets Flotantes con 1 Clic + Firma Fija)
+# BrisaPlan v7.0 — Plataforma Multi-Dispositivo
 
-## Huella SHA-1 Fija (Registrar en Firebase Console > `com.brisaplan.app`)
-`SHA1: 66:59:03:B8:0F:FD:6E:8F:03:F5:29:74:14:F5:5F:1B:AF:48:55:E2`
+## Novedades Principales en v7.0
+1. **Portal de Acceso Profesional y Sesión Persistente:** Inicio de sesión con Correo/Contraseña o Google (`browserLocalPersistence` + llave local de bóveda AES-256). No vuelve a pedir contraseña al recargar o reiniciar la aplicación hasta que cierres sesión manualmente.
+2. **Vista Hoy Enfocada:** Muestra únicamente los bloques activos del día, entregas urgentes, hábitos diarios y correos marcados como importantes.
+3. **Agenda Semanal Visual (Lunes a Domingo):** Tablero de 7 columnas en PC y selector táctil por día en celular. Agrega bloques con hora inicio/fin, interruptor de repetición semanal (permanente) o fecha única, 8 cuadritos de colores listos y ruleta cromática personalizada.
+4. **Tareas y Entregas en Bloques:** Tarjetas visuales con día y hora límite de entrega, estado automático (Hoy, Próxima, Vencida) y temporizador Pomodoro.
+5. **Bandeja de Correos Multi-Cuenta:** Barra superior para alternar sesiones entre todas tus cuentas vinculadas, selector de rango de 1 a 12 meses, buscador rápido en tiempo real y envío automático de correo oficial de confirmación al vincular una cuenta.
+6. **Tour Interactivo Spotlight:** Guía visual paso a paso que ilumina cada sección real de la interfaz.
 
-## Mejoras de la v10
-1. **Estética unificada Web y Android:** Paleta durazno-marfil y azul pastel con modo oscuro puro (`#000000`), tutorial interactivo paso a paso y textos 100% neutros para cualquier usuario.
-2. **Estudio flotante de Widgets con 1 clic:** Permite previsualizar en vivo 3 estilos (**Resumen Hoy**, **Agenda del Día** y **Rachas Activas**), activarlos/desactivarlos y fijarlos directamente en la pantalla de inicio con `AppWidgetManager.requestPinAppWidget()`.
-3. **Firma SHA-1 y Manifest garantizados:** `inject_native.py` se ejecuta después de `npx cap sync android` y configura `signingConfigs.debug` en `build.gradle` para eliminar el error `Something went wrong` en Google Sign-In.
+## Configuración en Google Cloud / Firebase
+1. En **Firebase Console → Authentication → Sign-in method**, asegúrate de tener habilitados **Correo electrónico/contraseña** y **Google**.
+2. En **Google Cloud Console → Google Auth Platform → Público / Acceso a datos**, incluye los scopes `gmail.modify` y `gmail.send` para habilitar la lectura por rango de meses y el envío del correo de verificación al conectar cuentas.
+
+## Cómo generar el archivo `BrisaPlan.apk` con Widgets Nativos Android
+El proyecto ya incluye `capacitor.config.json` listo para empaquetar en Android Studio:
+```bash
+npm init -y
+npm install @capacitor/core @capacitor/cli @capacitor/android
+npx cap add android
+npx cap sync android
+npx cap open android
+```
+Desde Android Studio, selecciona **Build → Build Bundle(s) / APK(s) → Build APK(s)** y sube el `.apk` resultante a tu GitHub Release (`https://github.com/tejon876/BrisaPlan/releases/latest/download/BrisaPlan.apk`).

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conectando con BrisaPlan...</title>
+</head>
+<body>
+  <p>Volviendo a BrisaPlan...</p>
+  <script>
+    (function () {
+      var search = window.location.search || "";
+      var hash = window.location.hash || "";
+      var target = "brisaplan://auth" + search + hash;
+      try { window.location.replace(target); } catch (e) {}
+      setTimeout(function () {
+        try { window.location.href = target; } catch (e) {}
+      }, 200);
+    })();
+  </script>
+</body>
+</html>
